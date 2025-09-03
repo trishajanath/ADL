@@ -30,3 +30,19 @@ class ConstructionStore {
     required this.products,
   });
 }
+
+class UserModel {
+  String uid;
+  String name;
+  String email;
+  String? phone;
+  String? photoUrl;
+
+  UserModel({
+    required this.uid,
+    required this.name,
+    required this.email,
+    this.phone,
+    this.photoUrl,
+  });
+}

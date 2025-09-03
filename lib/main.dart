@@ -7,6 +7,8 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import './data/models.dart';
 import './data/mock_data.dart';
 import './store_details_page.dart';
+import './auth_service.dart';
+import './user_profile_page.dart';
 
 void main() {
   runApp(const MyApp());
@@ -951,6 +953,8 @@ class _FavoritesPageState extends State<FavoritesPage> {
   }
 }
 
+// Replace the ENTIRE ProfilePage widget (both State and StatefulWidget)
+// with this new version. It will now act as a router.
 class ProfilePage extends StatefulWidget {
   const ProfilePage({Key? key}) : super(key: key);
 
@@ -958,7 +962,47 @@ class ProfilePage extends StatefulWidget {
   State<ProfilePage> createState() => _ProfilePageState();
 }
 
-class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStateMixin {
+class _ProfilePageState extends State<ProfilePage> {
+  final AuthService _authService = AuthService();
+
+  @override
+  void initState() {
+    super.initState();
+    _authService.addListener(_onAuthStateChanged);
+  }
+
+  @override
+  void dispose() {
+    _authService.removeListener(_onAuthStateChanged);
+    super.dispose();
+  }
+
+  void _onAuthStateChanged() {
+    setState(() {
+      // Rebuild the widget when auth state changes
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_authService.isLoggedIn) {
+      return const UserProfilePage();
+    } else {
+      return const LoginSignUpPage();
+    }
+  }
+}
+
+// Create this new widget for the Login/SignUp UI.
+// This is the content that was previously inside your ProfilePage.
+class LoginSignUpPage extends StatefulWidget {
+  const LoginSignUpPage({super.key});
+
+  @override
+  State<LoginSignUpPage> createState() => _LoginSignUpPageState();
+}
+
+class _LoginSignUpPageState extends State<LoginSignUpPage> with SingleTickerProviderStateMixin {
   late TabController _tabController;
   final _loginFormKey = GlobalKey<FormState>();
   final _signupFormKey = GlobalKey<FormState>();
@@ -987,109 +1031,51 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
     super.dispose();
   }
 
-  Future<void> _handleGoogleSignIn() async {
-    print('_handleGoogleSignIn function called!');
-    const storage = FlutterSecureStorage();
-    const serverUrl = 'http://localhost:8080'; // Use localhost for iOS simulator
-    const googleWebClientId = '137371359979-uteh19od42d7hjal2s75ifcbf8329i5i.apps.googleusercontent.com'; // Real Google Client ID
+  // Define your _handleGoogleSignIn and other button press methods here.
+  // Make sure they call the AuthService on success.
+  
+  void _handleEmailLogin() {
+    if (_loginFormKey.currentState!.validate()) {
+      AuthService().mockSignIn(_loginEmailController.text, _loginEmailController.text);
+    }
+  }
+  
+  void _handleEmailSignUp() {
+     if (_signupFormKey.currentState!.validate()) {
+      AuthService().mockSignIn(_signupNameController.text, _signupEmailController.text);
+    }
+  }
 
-    final GoogleSignIn googleSignIn = GoogleSignIn(serverClientId: googleWebClientId);
-
+   Future<void> _handleGoogleSignIn() async {
     try {
-      // First, check if user is already signed in
-      GoogleSignInAccount? currentUser = await googleSignIn.signInSilently();
-      
-      if (currentUser != null) {
-        print('User already signed in: ${currentUser.email}');
-        // User is already signed in, get fresh authentication
-        final GoogleSignInAuthentication googleAuth = await currentUser.authentication;
-        final String? idToken = googleAuth.idToken;
-        
-        if (idToken != null) {
-          // Continue with backend authentication
-          final response = await http.post(
-            Uri.parse('$serverUrl/api/v1/auth/google'),
-            headers: {'Content-Type': 'application/json'},
-            body: jsonEncode({'token': idToken}),
-          );
+      final GoogleSignInAccount? googleUser = await GoogleSignIn().signIn();
+      if (googleUser == null) return; // User cancelled
 
-          if (response.statusCode == 200) {
-            final data = jsonDecode(response.body);
-            final String sessionToken = data['token'];
-            final String userName = data['user']['name'];
-
-            await storage.write(key: 'session_token', value: sessionToken);
-
-            if (mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('Welcome back, $userName!'),
-                  backgroundColor: Colors.green,
-                ),
-              );
-            }
-          }
-        }
-        return;
-      }
-
-      print('Attempting Google Sign-In...');
-      final GoogleSignInAccount? googleUser = await googleSignIn.signIn();
-      print('Google Sign-In result: $googleUser');
-      if (googleUser == null) {
-        // User cancelled the sign-in
-        print('User cancelled Google Sign-In');
-        return;
-      }
-      print('Google Sign-In successful for: ${googleUser.email}');
-
-      final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
-      final String? idToken = googleAuth.idToken;
-
-      if (idToken == null) {
-        throw Exception('Could not retrieve ID token.');
-      }
-
-      final response = await http.post(
-        Uri.parse('$serverUrl/api/v1/auth/google'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'token': idToken}),
-      );
-
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        final String sessionToken = data['token'];
-        final String userName = data['user']['name'];
-
-        await storage.write(key: 'session_token', value: sessionToken);
-
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Welcome, $userName!'),
-              backgroundColor: Colors.green,
-            ),
-          );
-        }
-      } else {
-        final errorBody = jsonDecode(response.body);
-        throw Exception('Failed to sign in: ${errorBody['message']}');
-      }
+      AuthService().signInWithGoogle(UserModel(
+        uid: googleUser.id,
+        name: googleUser.displayName ?? 'No Name',
+        email: googleUser.email,
+        photoUrl: googleUser.photoUrl,
+      ));
     } catch (error) {
-      print('Google Sign-In Error: $error');
-      if (mounted) {
+       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Sign-in failed: $error'),
-            backgroundColor: Colors.red,
-          ),
+          SnackBar(content: Text('Google Sign-In failed: $error'), backgroundColor: Colors.red),
         );
       }
     }
   }
 
-  @override
+  // Paste the full build method and all helper methods
+  // from your OLD _ProfilePageState here.
+  // IMPORTANT: For the regular login/signup buttons, change their `onPressed`
+  // handlers to call `_handleEmailLogin()` and `_handleEmailSignUp()` respectively.
+  // And for the Google login/signup buttons, change their `onTap` to call `_handleGoogleSignIn()`.
+  
+   @override
   Widget build(BuildContext context) {
+    // This is where you paste the ENTIRE UI from your previous ProfilePage
+    // (the one with the TabController, TextFormFields, etc.)
     return Scaffold(
       backgroundColor: Colors.white,
       body: SafeArea(
@@ -1140,32 +1126,6 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
                     ),
                   ),
                 ],
-              ),
-            ),
-            
-            // Sign Out Button
-            Container(
-              margin: const EdgeInsets.symmetric(horizontal: 24),
-              child: ElevatedButton(
-                onPressed: () async {
-                  final GoogleSignIn googleSignIn = GoogleSignIn(
-                    serverClientId: '137371359979-uteh19od42d7hjal2s75ifcbf8329i5i.apps.googleusercontent.com'
-                  );
-                  await googleSignIn.signOut();
-                  if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Signed out successfully'),
-                        backgroundColor: Colors.blue,
-                      ),
-                    );
-                  }
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.red,
-                  foregroundColor: Colors.white,
-                ),
-                child: const Text('Sign Out of Google'),
               ),
             ),
             
@@ -1402,16 +1362,7 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
                 ],
               ),
               child: ElevatedButton(
-                onPressed: () {
-                  if (_loginFormKey.currentState!.validate()) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('Welcome back, ${_loginEmailController.text}!'),
-                        backgroundColor: Colors.green,
-                      ),
-                    );
-                  }
-                },
+                onPressed: _handleEmailLogin,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.transparent,
                   shadowColor: Colors.transparent,
@@ -1737,16 +1688,7 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
                 ],
               ),
               child: ElevatedButton(
-                onPressed: () {
-                  if (_signupFormKey.currentState!.validate()) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('Welcome to Building Platform, ${_signupNameController.text}!'),
-                        backgroundColor: Colors.green,
-                      ),
-                    );
-                  }
-                },
+                onPressed: _handleEmailSignUp,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.transparent,
                   shadowColor: Colors.transparent,
