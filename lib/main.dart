@@ -4,6 +4,9 @@ import 'package:google_sign_in/google_sign_in.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import './data/models.dart';
+import './data/mock_data.dart';
+import './store_details_page.dart';
 
 void main() {
   runApp(const MyApp());
@@ -433,8 +436,51 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   }
 }
 
-class SearchPage extends StatelessWidget {
+class SearchPage extends StatefulWidget {
   const SearchPage({super.key});
+
+  @override
+  State<SearchPage> createState() => _SearchPageState();
+}
+
+class _SearchPageState extends State<SearchPage> {
+  final _searchController = TextEditingController();
+  late List<ConstructionStore> _allStores;
+  List<ConstructionStore> _filteredStores = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _allStores = MockDataService.getStores();
+    _filteredStores = _allStores;
+    _searchController.addListener(_filterStores);
+  }
+
+  @override
+  void dispose() {
+    _searchController.removeListener(_filterStores);
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  void _filterStores() {
+    final query = _searchController.text.toLowerCase();
+    setState(() {
+      _filteredStores = _allStores.where((store) {
+        final storeName = store.name.toLowerCase();
+        final storeLocation = store.location.toLowerCase();
+        return storeName.contains(query) || storeLocation.contains(query);
+      }).toList();
+    });
+  }
+
+  void _navigateToStoreDetails(ConstructionStore store) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => StoreDetailsPage(store: store),
+      ),
+    ).then((_) => setState(() {})); // Rebuild to reflect favorite changes
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -442,53 +488,86 @@ class SearchPage extends StatelessWidget {
       backgroundColor: Colors.white,
       body: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.all(20),
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
           child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Search',
+                'Find a Store',
                 style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                       fontWeight: FontWeight.bold,
                       color: const Color(0xFF1E3A8A),
                     ),
               ),
-              const SizedBox(height: 20),
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                decoration: BoxDecoration(
-                  color: Colors.grey[100],
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Row(
-                  children: [
-                    Icon(
-                      Icons.search,
-                      color: Colors.grey[600],
-                      size: 20,
-                    ),
-                    const SizedBox(width: 12),
-                    Text(
-                      'Search for building solutions...',
-                      style: TextStyle(
-                        color: Colors.grey[600],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 40),
-              Icon(
-                Icons.search_off,
-                size: 64,
-                color: Colors.grey[400],
-              ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 8),
               Text(
-                'Search functionality coming soon!',
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                'Search for construction materials in Tamil Nadu.',
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                       color: Colors.grey[600],
                     ),
+              ),
+              const SizedBox(height: 20),
+              TextField(
+                controller: _searchController,
+                decoration: InputDecoration(
+                  hintText: 'Search by store name or city...',
+                  prefixIcon: Icon(Icons.search, color: Colors.grey[600]),
+                  filled: true,
+                  fillColor: Colors.grey[100],
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide.none,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 20),
+              Expanded(
+                child: GridView.builder(
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 2,
+                    crossAxisSpacing: 16,
+                    mainAxisSpacing: 16,
+                    childAspectRatio: 0.8,
+                  ),
+                  itemCount: _filteredStores.length,
+                  itemBuilder: (context, index) {
+                    final store = _filteredStores[index];
+                    return GestureDetector(
+                      onTap: () => _navigateToStoreDetails(store),
+                      child: Card(
+                        clipBehavior: Clip.antiAlias,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        elevation: 4,
+                        shadowColor: Colors.black.withOpacity(0.1),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            Expanded(
+                              child: Image.network(
+                                store.imageUrl,
+                                fit: BoxFit.cover,
+                              ),
+                            ),
+                            Padding(
+                              padding: const EdgeInsets.all(8.0),
+                              child: Text(
+                                store.name,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 14,
+                                ),
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
               ),
             ],
           ),
@@ -690,8 +769,34 @@ class QuestionnairePage extends StatelessWidget {
   }
 }
 
-class FavoritesPage extends StatelessWidget {
+class FavoritesPage extends StatefulWidget {
   const FavoritesPage({super.key});
+
+  @override
+  State<FavoritesPage> createState() => _FavoritesPageState();
+}
+
+class _FavoritesPageState extends State<FavoritesPage> {
+  List<Product> _favoritedProducts = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadFavorites();
+  }
+
+  void _loadFavorites() {
+    setState(() {
+      _favoritedProducts = MockDataService.getFavoritedProducts();
+    });
+  }
+
+  void _toggleFavorite(String productId) {
+    setState(() {
+      MockDataService.toggleFavoriteStatus(productId);
+      _loadFavorites();
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -701,27 +806,67 @@ class FavoritesPage extends StatelessWidget {
         child: Padding(
           padding: const EdgeInsets.all(20),
           child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Favorites',
+                'Favorite Products',
                 style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                       fontWeight: FontWeight.bold,
                       color: const Color(0xFF1E3A8A),
                     ),
               ),
-              const SizedBox(height: 40),
-              Icon(
-                Icons.favorite_border,
-                size: 64,
-                color: Colors.grey[400],
-              ),
-              const SizedBox(height: 16),
-              Text(
-                'No favorites yet',
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      color: Colors.grey[600],
+              const SizedBox(height: 20),
+              _favoritedProducts.isEmpty
+                  ? Expanded(
+                      child: Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.favorite_border, size: 64, color: Colors.grey[400]),
+                            const SizedBox(height: 16),
+                            Text(
+                              'No favorites yet',
+                              style: Theme.of(context).textTheme.titleMedium?.copyWith(color: Colors.grey[600]),
+                            ),
+                            const Text(
+                              'Tap the heart icon on a product to save it.',
+                              style: TextStyle(color: Colors.grey),
+                            ),
+                          ],
+                        ),
+                      ),
+                    )
+                  : Expanded(
+                      child: ListView.builder(
+                        itemCount: _favoritedProducts.length,
+                        itemBuilder: (context, index) {
+                          final product = _favoritedProducts[index];
+                          return Card(
+                            margin: const EdgeInsets.only(bottom: 12),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: ListTile(
+                              leading: ClipRRect(
+                                borderRadius: BorderRadius.circular(8.0),
+                                child: Image.network(
+                                  product.imageUrl,
+                                  width: 50,
+                                  height: 50,
+                                  fit: BoxFit.cover,
+                                ),
+                              ),
+                              title: Text(product.name),
+                              subtitle: Text('₹${product.price.toStringAsFixed(2)}'),
+                              trailing: IconButton(
+                                icon: const Icon(Icons.favorite, color: Colors.redAccent),
+                                onPressed: () => _toggleFavorite(product.id),
+                              ),
+                            ),
+                          );
+                        },
+                      ),
                     ),
-              ),
             ],
           ),
         ),
