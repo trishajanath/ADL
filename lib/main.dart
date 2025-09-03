@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:google_sign_in/google_sign_in.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 void main() {
   runApp(const MyApp());
@@ -838,6 +842,107 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
     super.dispose();
   }
 
+  Future<void> _handleGoogleSignIn() async {
+    print('_handleGoogleSignIn function called!');
+    const storage = FlutterSecureStorage();
+    const serverUrl = 'http://localhost:8080'; // Use localhost for iOS simulator
+    const googleWebClientId = '137371359979-uteh19od42d7hjal2s75ifcbf8329i5i.apps.googleusercontent.com'; // Real Google Client ID
+
+    final GoogleSignIn googleSignIn = GoogleSignIn(serverClientId: googleWebClientId);
+
+    try {
+      // First, check if user is already signed in
+      GoogleSignInAccount? currentUser = await googleSignIn.signInSilently();
+      
+      if (currentUser != null) {
+        print('User already signed in: ${currentUser.email}');
+        // User is already signed in, get fresh authentication
+        final GoogleSignInAuthentication googleAuth = await currentUser.authentication;
+        final String? idToken = googleAuth.idToken;
+        
+        if (idToken != null) {
+          // Continue with backend authentication
+          final response = await http.post(
+            Uri.parse('$serverUrl/api/v1/auth/google'),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({'token': idToken}),
+          );
+
+          if (response.statusCode == 200) {
+            final data = jsonDecode(response.body);
+            final String sessionToken = data['token'];
+            final String userName = data['user']['name'];
+
+            await storage.write(key: 'session_token', value: sessionToken);
+
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Welcome back, $userName!'),
+                  backgroundColor: Colors.green,
+                ),
+              );
+            }
+          }
+        }
+        return;
+      }
+
+      print('Attempting Google Sign-In...');
+      final GoogleSignInAccount? googleUser = await googleSignIn.signIn();
+      print('Google Sign-In result: $googleUser');
+      if (googleUser == null) {
+        // User cancelled the sign-in
+        print('User cancelled Google Sign-In');
+        return;
+      }
+      print('Google Sign-In successful for: ${googleUser.email}');
+
+      final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
+      final String? idToken = googleAuth.idToken;
+
+      if (idToken == null) {
+        throw Exception('Could not retrieve ID token.');
+      }
+
+      final response = await http.post(
+        Uri.parse('$serverUrl/api/v1/auth/google'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'token': idToken}),
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final String sessionToken = data['token'];
+        final String userName = data['user']['name'];
+
+        await storage.write(key: 'session_token', value: sessionToken);
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Welcome, $userName!'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
+      } else {
+        final errorBody = jsonDecode(response.body);
+        throw Exception('Failed to sign in: ${errorBody['message']}');
+      }
+    } catch (error) {
+      print('Google Sign-In Error: $error');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Sign-in failed: $error'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -890,6 +995,32 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
                     ),
                   ),
                 ],
+              ),
+            ),
+            
+            // Sign Out Button
+            Container(
+              margin: const EdgeInsets.symmetric(horizontal: 24),
+              child: ElevatedButton(
+                onPressed: () async {
+                  final GoogleSignIn googleSignIn = GoogleSignIn(
+                    serverClientId: '137371359979-uteh19od42d7hjal2s75ifcbf8329i5i.apps.googleusercontent.com'
+                  );
+                  await googleSignIn.signOut();
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Signed out successfully'),
+                        backgroundColor: Colors.blue,
+                      ),
+                    );
+                  }
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.red,
+                  foregroundColor: Colors.white,
+                ),
+                child: const Text('Sign Out of Google'),
               ),
             ),
             
@@ -1260,12 +1391,8 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
                     child: InkWell(
                       borderRadius: BorderRadius.circular(12),
                       onTap: () {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Google login coming soon!'),
-                            backgroundColor: Color(0xFF1E3A8A),
-                          ),
-                        );
+                        print('Google Sign-In button tapped!');
+                        _handleGoogleSignIn();
                       },
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.center,
@@ -1599,12 +1726,8 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
                     child: InkWell(
                       borderRadius: BorderRadius.circular(12),
                       onTap: () {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Google sign up coming soon!'),
-                            backgroundColor: Color(0xFF1E3A8A),
-                          ),
-                        );
+                        print('Google Sign-In button tapped!');
+                        _handleGoogleSignIn();
                       },
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.center,
@@ -2542,6 +2665,107 @@ class _LoginPageState extends State<LoginPage> {
     super.dispose();
   }
 
+  Future<void> _handleGoogleSignIn() async {
+    print('_handleGoogleSignIn function called!');
+    const storage = FlutterSecureStorage();
+    const serverUrl = 'http://localhost:8080'; // Use localhost for iOS simulator
+    const googleWebClientId = '137371359979-uteh19od42d7hjal2s75ifcbf8329i5i.apps.googleusercontent.com'; // Real Google Client ID
+
+    final GoogleSignIn googleSignIn = GoogleSignIn(serverClientId: googleWebClientId);
+
+    try {
+      // First, check if user is already signed in
+      GoogleSignInAccount? currentUser = await googleSignIn.signInSilently();
+      
+      if (currentUser != null) {
+        print('User already signed in: ${currentUser.email}');
+        // User is already signed in, get fresh authentication
+        final GoogleSignInAuthentication googleAuth = await currentUser.authentication;
+        final String? idToken = googleAuth.idToken;
+        
+        if (idToken != null) {
+          // Continue with backend authentication
+          final response = await http.post(
+            Uri.parse('$serverUrl/api/v1/auth/google'),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({'token': idToken}),
+          );
+
+          if (response.statusCode == 200) {
+            final data = jsonDecode(response.body);
+            final String sessionToken = data['token'];
+            final String userName = data['user']['name'];
+
+            await storage.write(key: 'session_token', value: sessionToken);
+
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Welcome back, $userName!'),
+                  backgroundColor: Colors.green,
+                ),
+              );
+            }
+          }
+        }
+        return;
+      }
+
+      print('Attempting Google Sign-In...');
+      final GoogleSignInAccount? googleUser = await googleSignIn.signIn();
+      print('Google Sign-In result: $googleUser');
+      if (googleUser == null) {
+        // User cancelled the sign-in
+        print('User cancelled Google Sign-In');
+        return;
+      }
+      print('Google Sign-In successful for: ${googleUser.email}');
+
+      final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
+      final String? idToken = googleAuth.idToken;
+
+      if (idToken == null) {
+        throw Exception('Could not retrieve ID token.');
+      }
+
+      final response = await http.post(
+        Uri.parse('$serverUrl/api/v1/auth/google'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'token': idToken}),
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final String sessionToken = data['token'];
+        final String userName = data['user']['name'];
+
+        await storage.write(key: 'session_token', value: sessionToken);
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Welcome, $userName!'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
+      } else {
+        final errorBody = jsonDecode(response.body);
+        throw Exception('Failed to sign in: ${errorBody['message']}');
+      }
+    } catch (error) {
+      print('Google Sign-In Error: $error');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Sign-in failed: $error'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -2856,13 +3080,9 @@ class _LoginPageState extends State<LoginPage> {
                               child: InkWell(
                                 borderRadius: BorderRadius.circular(12),
                                 onTap: () {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                      content: Text('Google login coming soon!'),
-                                      backgroundColor: Color(0xFF1E3A8A),
-                                    ),
-                                  );
-                                },
+                        print('Google Sign-In button tapped!');
+                        _handleGoogleSignIn();
+                      },
                                 child: Row(
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   children: [
