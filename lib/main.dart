@@ -550,6 +550,16 @@ class _SearchPageState extends State<SearchPage> {
                               child: Image.network(
                                 store.imageUrl,
                                 fit: BoxFit.cover,
+                                errorBuilder: (context, error, stackTrace) {
+                                  return Container(
+                                    color: Colors.grey[300],
+                                    child: const Icon(
+                                      Icons.store,
+                                      size: 50,
+                                      color: Colors.grey,
+                                    ),
+                                  );
+                                },
                               ),
                             ),
                             Padding(
@@ -856,6 +866,21 @@ class _FavoritesPageState extends State<FavoritesPage> {
                                   width: 50,
                                   height: 50,
                                   fit: BoxFit.cover,
+                                  errorBuilder: (context, error, stackTrace) {
+                                    return Container(
+                                      width: 50,
+                                      height: 50,
+                                      decoration: BoxDecoration(
+                                        color: Colors.grey[300],
+                                        borderRadius: BorderRadius.circular(8.0),
+                                      ),
+                                      child: const Icon(
+                                        Icons.shopping_bag,
+                                        color: Colors.grey,
+                                        size: 24,
+                                      ),
+                                    );
+                                  },
                                 ),
                               ),
                               title: Text(product.name),
