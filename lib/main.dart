@@ -1046,19 +1046,109 @@ class _LoginSignUpPageState extends State<LoginSignUpPage> with SingleTickerProv
     }
   }
 
-   Future<void> _handleGoogleSignIn() async {
-    try {
-      final GoogleSignInAccount? googleUser = await GoogleSignIn().signIn();
-      if (googleUser == null) return; // User cancelled
+  Future<void> _handleGoogleSignIn() async {
+    print('_handleGoogleSignIn function called!');
+    const storage = FlutterSecureStorage();
+    const serverUrl = 'http://localhost:8080'; // Use localhost for iOS simulator
+    const googleWebClientId = '137371359979-uteh19od42d7hjal2s75ifcbf8329i5i.apps.googleusercontent.com'; // Real Google Client ID
 
-      AuthService().signInWithGoogle(UserModel(
-        uid: googleUser.id,
-        name: googleUser.displayName ?? 'No Name',
-        email: googleUser.email,
-        photoUrl: googleUser.photoUrl,
-      ));
+    final GoogleSignIn googleSignIn = GoogleSignIn(serverClientId: googleWebClientId);
+
+    try {
+      // First, check if user is already signed in
+      GoogleSignInAccount? currentUser = await googleSignIn.signInSilently();
+      
+      if (currentUser != null) {
+        print('User already signed in: ${currentUser.email}');
+        // User is already signed in, get fresh authentication
+        final GoogleSignInAuthentication googleAuth = await currentUser.authentication;
+        final String? idToken = googleAuth.idToken;
+        
+        if (idToken != null) {
+          // Continue with backend authentication
+          final response = await http.post(
+            Uri.parse('$serverUrl/api/v1/auth/google'),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({'idToken': idToken}),
+          );
+
+          if (response.statusCode == 200) {
+            final data = jsonDecode(response.body);
+            await storage.write(key: 'jwt_token', value: data['token']);
+            
+            // Create user model and sign in
+            final user = UserModel(
+              uid: data['user']['uid'] ?? '',
+              name: data['user']['name'] ?? 'Unknown User',
+              email: data['user']['email'] ?? '',
+              photoUrl: data['user']['photoUrl'],
+            );
+            
+            AuthService().signInWithGoogle(user);
+            
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Welcome back!'), backgroundColor: Colors.green),
+              );
+            }
+            return;
+          }
+        }
+      }
+
+      print('Attempting Google Sign-In...');
+      final GoogleSignInAccount? googleUser = await googleSignIn.signIn();
+      print('Google Sign-In result: $googleUser');
+      if (googleUser == null) {
+        // User cancelled the sign-in
+        print('User cancelled Google Sign-In');
+        return;
+      }
+
+      print('Google Sign-In successful for: ${googleUser.email}');
+
+      final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
+      final String? idToken = googleAuth.idToken;
+
+      if (idToken == null) {
+        throw Exception('Could not retrieve ID token.');
+      }
+
+      print('Sending ID token to backend...');
+      final response = await http.post(
+        Uri.parse('$serverUrl/api/v1/auth/google'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'idToken': idToken}),
+      );
+
+      print('Backend response status: ${response.statusCode}');
+      print('Backend response body: ${response.body}');
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        await storage.write(key: 'jwt_token', value: data['token']);
+        
+        // Create user model and sign in
+        final user = UserModel(
+          uid: data['user']['uid'],
+          name: data['user']['name'],
+          email: data['user']['email'],
+          photoUrl: data['user']['photoUrl'],
+        );
+        
+        AuthService().signInWithGoogle(user);
+        
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Successfully signed in!'), backgroundColor: Colors.green),
+          );
+        }
+      } else {
+        throw Exception('Backend authentication failed: ${response.body}');
+      }
     } catch (error) {
-       if (mounted) {
+      print('Google Sign-In error: $error');
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Google Sign-In failed: $error'), backgroundColor: Colors.red),
         );
@@ -2775,27 +2865,31 @@ class _LoginPageState extends State<LoginPage> {
           final response = await http.post(
             Uri.parse('$serverUrl/api/v1/auth/google'),
             headers: {'Content-Type': 'application/json'},
-            body: jsonEncode({'token': idToken}),
+            body: jsonEncode({'idToken': idToken}),
           );
 
           if (response.statusCode == 200) {
             final data = jsonDecode(response.body);
-            final String sessionToken = data['token'];
-            final String userName = data['user']['name'];
-
-            await storage.write(key: 'session_token', value: sessionToken);
-
+            await storage.write(key: 'jwt_token', value: data['token']);
+            
+            // Create user model and sign in
+            final user = UserModel(
+              uid: data['user']['uid'] ?? '',
+              name: data['user']['name'] ?? 'Unknown User',
+              email: data['user']['email'] ?? '',
+              photoUrl: data['user']['photoUrl'],
+            );
+            
+            AuthService().signInWithGoogle(user);
+            
             if (mounted) {
               ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('Welcome back, $userName!'),
-                  backgroundColor: Colors.green,
-                ),
+                const SnackBar(content: Text('Welcome back!'), backgroundColor: Colors.green),
               );
             }
+            return;
           }
         }
-        return;
       }
 
       print('Attempting Google Sign-In...');
@@ -2806,6 +2900,7 @@ class _LoginPageState extends State<LoginPage> {
         print('User cancelled Google Sign-In');
         return;
       }
+
       print('Google Sign-In successful for: ${googleUser.email}');
 
       final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
@@ -2815,39 +2910,43 @@ class _LoginPageState extends State<LoginPage> {
         throw Exception('Could not retrieve ID token.');
       }
 
+      print('Sending ID token to backend...');
       final response = await http.post(
         Uri.parse('$serverUrl/api/v1/auth/google'),
         headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'token': idToken}),
+        body: jsonEncode({'idToken': idToken}),
       );
+
+      print('Backend response status: ${response.statusCode}');
+      print('Backend response body: ${response.body}');
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        final String sessionToken = data['token'];
-        final String userName = data['user']['name'];
-
-        await storage.write(key: 'session_token', value: sessionToken);
-
+        await storage.write(key: 'jwt_token', value: data['token']);
+        
+        // Create user model and sign in
+        final user = UserModel(
+          uid: data['user']['uid'],
+          name: data['user']['name'],
+          email: data['user']['email'],
+          photoUrl: data['user']['photoUrl'],
+        );
+        
+        AuthService().signInWithGoogle(user);
+        
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Welcome, $userName!'),
-              backgroundColor: Colors.green,
-            ),
+            const SnackBar(content: Text('Successfully signed in!'), backgroundColor: Colors.green),
           );
         }
       } else {
-        final errorBody = jsonDecode(response.body);
-        throw Exception('Failed to sign in: ${errorBody['message']}');
+        throw Exception('Backend authentication failed: ${response.body}');
       }
     } catch (error) {
-      print('Google Sign-In Error: $error');
+      print('Google Sign-In error: $error');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Sign-in failed: $error'),
-            backgroundColor: Colors.red,
-          ),
+          SnackBar(content: Text('Google Sign-In failed: $error'), backgroundColor: Colors.red),
         );
       }
     }
