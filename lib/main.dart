@@ -1049,7 +1049,7 @@ class _LoginSignUpPageState extends State<LoginSignUpPage> with SingleTickerProv
   Future<void> _handleGoogleSignIn() async {
     print('_handleGoogleSignIn function called!');
     const storage = FlutterSecureStorage();
-    const serverUrl = 'http://localhost:8080'; // Use localhost for iOS simulator
+    const serverUrl = 'http://127.0.0.1:8080'; // Use 127.0.0.1 for iOS simulator
     const googleWebClientId = '137371359979-uteh19od42d7hjal2s75ifcbf8329i5i.apps.googleusercontent.com'; // Real Google Client ID
 
     final GoogleSignIn googleSignIn = GoogleSignIn(serverClientId: googleWebClientId);
@@ -1107,11 +1107,27 @@ class _LoginSignUpPageState extends State<LoginSignUpPage> with SingleTickerProv
 
       print('Google Sign-In successful for: ${googleUser.email}');
 
-      final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
-      final String? idToken = googleAuth.idToken;
+      // Try to obtain a valid ID token reliably across iOS/Android
+      GoogleSignInAuthentication googleAuth = await googleUser.authentication;
+      String? idToken = googleAuth.idToken;
+
+      // Fallbacks: sometimes idToken can be null on iOS if the token is stale
+      if (idToken == null) {
+        print('Primary idToken was null, attempting silent re-authentication...');
+        final GoogleSignInAccount? refreshedUser = await googleSignIn.signInSilently();
+        if (refreshedUser != null) {
+          googleAuth = await refreshedUser.authentication;
+          idToken = googleAuth.idToken;
+        }
+      }
+      if (idToken == null && googleSignIn.currentUser != null) {
+        print('Attempting to fetch authentication from currentUser...');
+        googleAuth = await googleSignIn.currentUser!.authentication;
+        idToken = googleAuth.idToken;
+      }
 
       if (idToken == null) {
-        throw Exception('Could not retrieve ID token.');
+        throw Exception('Could not retrieve ID token. Please ensure the iOS reversed client ID and Web client ID are configured correctly.');
       }
 
       print('Sending ID token to backend...');
@@ -2845,7 +2861,7 @@ class _LoginPageState extends State<LoginPage> {
   Future<void> _handleGoogleSignIn() async {
     print('_handleGoogleSignIn function called!');
     const storage = FlutterSecureStorage();
-    const serverUrl = 'http://localhost:8080'; // Use localhost for iOS simulator
+    const serverUrl = 'http://127.0.0.1:8080'; // Use 127.0.0.1 for iOS simulator
     const googleWebClientId = '137371359979-uteh19od42d7hjal2s75ifcbf8329i5i.apps.googleusercontent.com'; // Real Google Client ID
 
     final GoogleSignIn googleSignIn = GoogleSignIn(serverClientId: googleWebClientId);
@@ -2903,11 +2919,27 @@ class _LoginPageState extends State<LoginPage> {
 
       print('Google Sign-In successful for: ${googleUser.email}');
 
-      final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
-      final String? idToken = googleAuth.idToken;
+      // Try to obtain a valid ID token reliably across iOS/Android
+      GoogleSignInAuthentication googleAuth = await googleUser.authentication;
+      String? idToken = googleAuth.idToken;
+
+      // Fallbacks: sometimes idToken can be null on iOS if the token is stale
+      if (idToken == null) {
+        print('Primary idToken was null, attempting silent re-authentication...');
+        final GoogleSignInAccount? refreshedUser = await googleSignIn.signInSilently();
+        if (refreshedUser != null) {
+          googleAuth = await refreshedUser.authentication;
+          idToken = googleAuth.idToken;
+        }
+      }
+      if (idToken == null && googleSignIn.currentUser != null) {
+        print('Attempting to fetch authentication from currentUser...');
+        googleAuth = await googleSignIn.currentUser!.authentication;
+        idToken = googleAuth.idToken;
+      }
 
       if (idToken == null) {
-        throw Exception('Could not retrieve ID token.');
+        throw Exception('Could not retrieve ID token. Please ensure the iOS reversed client ID and Web client ID are configured correctly.');
       }
 
       print('Sending ID token to backend...');
