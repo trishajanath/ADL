@@ -14,6 +14,14 @@ class ConstructionStore {
   final bool isOpen;
   final String? phoneNumber;
   final double distance;
+  final String? website;
+  final List<String>? openingHours;
+  final int? priceLevel;
+  final int? userRatingsTotal;
+  final List<String>? types;
+  final String? formattedAddress;
+  final List<Map<String, dynamic>>? reviews;
+  final List<String>? photos;
 
   ConstructionStore({
     required this.placeId,
@@ -26,6 +34,14 @@ class ConstructionStore {
     required this.isOpen,
     this.phoneNumber,
     required this.distance,
+    this.website,
+    this.openingHours,
+    this.priceLevel,
+    this.userRatingsTotal,
+    this.types,
+    this.formattedAddress,
+    this.reviews,
+    this.photos,
   });
 
   factory ConstructionStore.fromJson(Map<String, dynamic> json, double userLat, double userLng) {
@@ -48,6 +64,12 @@ class ConstructionStore {
       isOpen: json['opening_hours']?['open_now'] ?? false,
       phoneNumber: json['formatted_phone_number'],
       distance: distance,
+      website: json['website'],
+      openingHours: json['opening_hours']?['weekday_text']?.cast<String>(),
+      priceLevel: json['price_level'],
+      userRatingsTotal: json['user_ratings_total'],
+      types: json['types']?.cast<String>(),
+      formattedAddress: json['formatted_address'],
     );
   }
 }
@@ -75,6 +97,48 @@ class GooglePlacesService {
           isOpen: true,
           phoneNumber: '+1 (415) 555-0123',
           distance: 800,
+          website: 'https://buildmate-sf.com',
+          openingHours: [
+            'Monday: 7:00 AM – 6:00 PM',
+            'Tuesday: 7:00 AM – 6:00 PM', 
+            'Wednesday: 7:00 AM – 6:00 PM',
+            'Thursday: 7:00 AM – 6:00 PM',
+            'Friday: 7:00 AM – 6:00 PM',
+            'Saturday: 8:00 AM – 5:00 PM',
+            'Sunday: Closed'
+          ],
+          priceLevel: 2,
+          userRatingsTotal: 127,
+          types: ['hardware_store', 'home_goods_store', 'establishment'],
+          formattedAddress: '1234 Mission St, San Francisco, CA 94103, USA',
+          reviews: [
+            {
+              'author_name': 'John D.',
+              'rating': 5,
+              'text': 'Excellent selection of construction materials. Staff is very knowledgeable and helpful. Found everything I needed for my home renovation project.',
+              'time': '2024-09-15',
+              'relative_time_description': '3 weeks ago'
+            },
+            {
+              'author_name': 'Sarah M.',
+              'rating': 4,
+              'text': 'Good quality materials and competitive prices. The store is well-organized and easy to navigate.',
+              'time': '2024-09-10',
+              'relative_time_description': '4 weeks ago'
+            },
+            {
+              'author_name': 'Mike R.',
+              'rating': 4,
+              'text': 'Great place for professional contractors. They have bulk quantities and delivery service.',
+              'time': '2024-08-28',
+              'relative_time_description': '6 weeks ago'
+            }
+          ],
+          photos: [
+            'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=400',
+            'https://images.unsplash.com/photo-1504307651254-35680f356dfd?w=400',
+            'https://images.unsplash.com/photo-1581244277943-fe4a9c777189?w=400'
+          ],
         ),
         ConstructionStore(
           placeId: 'mock_sf_2', 
@@ -86,6 +150,40 @@ class GooglePlacesService {
           isOpen: true,
           phoneNumber: '+1 (415) 555-0124',
           distance: 1200,
+          website: 'https://goldengate-hardware.com',
+          openingHours: [
+            'Monday: 6:30 AM – 7:00 PM',
+            'Tuesday: 6:30 AM – 7:00 PM', 
+            'Wednesday: 6:30 AM – 7:00 PM',
+            'Thursday: 6:30 AM – 7:00 PM',
+            'Friday: 6:30 AM – 7:00 PM',
+            'Saturday: 7:00 AM – 6:00 PM',
+            'Sunday: 8:00 AM – 4:00 PM'
+          ],
+          priceLevel: 2,
+          userRatingsTotal: 89,
+          types: ['hardware_store', 'establishment'],
+          formattedAddress: '567 Castro St, San Francisco, CA 94114, USA',
+          reviews: [
+            {
+              'author_name': 'Lisa K.',
+              'rating': 4,
+              'text': 'Family-owned business with great customer service. They know their products well and offer helpful advice.',
+              'time': '2024-09-20',
+              'relative_time_description': '2 weeks ago'
+            },
+            {
+              'author_name': 'Tom B.',
+              'rating': 5,
+              'text': 'Best cement supplier in the area. Always have what I need in stock.',
+              'time': '2024-09-05',
+              'relative_time_description': '1 month ago'
+            }
+          ],
+          photos: [
+            'https://images.unsplash.com/photo-1586864387967-d02ef85d93e8?w=400',
+            'https://images.unsplash.com/photo-1621905252507-b35492cc74b4?w=400'
+          ],
         ),
         ConstructionStore(
           placeId: 'mock_sf_3',
@@ -218,8 +316,17 @@ class GooglePlacesService {
             latitude: store['latitude'].toDouble(),
             longitude: store['longitude'].toDouble(),
             isOpen: store['isOpen'] ?? false,
-            phoneNumber: null, // Would need additional API call for phone
+            phoneNumber: store['phone_number'], 
             distance: distance,
+            website: store['website'],
+            openingHours: store['opening_hours']?.cast<String>(),
+            priceLevel: store['price_level'],
+            userRatingsTotal: store['user_ratings_total'],
+            types: store['types']?.cast<String>(),
+            formattedAddress: store['formatted_address'],
+            photoReference: store['photo_reference'],
+            photos: store['photos']?.cast<String>(),
+            reviews: store['reviews']?.cast<Map<String, dynamic>>(),
           );
         }).toList();
 
@@ -253,12 +360,24 @@ class GooglePlacesService {
   }
 
   static String getPhotoUrl(String photoReference, {int maxWidth = 400}) {
-    // For now, return a placeholder since we're using backend API
-    return 'https://via.placeholder.com/${maxWidth}x300?text=Store+Photo';
+    // If we have a photo reference, try to get the actual photo via backend
+    if (photoReference.isNotEmpty && !photoReference.startsWith('http')) {
+      return '$_backendUrl/api/v1/store-photo/$photoReference?maxwidth=$maxWidth';
+    }
+    
+    // If it's already a URL, return it directly
+    if (photoReference.startsWith('http')) {
+      return photoReference;
+    }
+    
+    // Fallback to placeholder
+    return 'https://via.placeholder.com/${maxWidth}x300/e3f2fd/6366f1?text=Construction+Store';
   }
 
   static Future<Map<String, dynamic>?> getStoreDetails(String placeId) async {
     try {
+      print('🔍 Fetching detailed information for place_id: $placeId');
+      
       // Call backend API for store details
       final response = await http.get(
         Uri.parse('$_backendUrl/api/v1/store-details/$placeId'),
@@ -266,11 +385,20 @@ class GooglePlacesService {
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
+        
+        if (data['error'] != null) {
+          print('❌ Backend API Error: ${data['error']}');
+          return null;
+        }
+        
+        print('✅ Retrieved detailed store information');
         return data['details'];
+      } else {
+        print('❌ HTTP Error: ${response.statusCode}');
+        return null;
       }
-      return null;
     } catch (e) {
-      print('Error getting store details: $e');
+      print('❌ Error getting store details: $e');
       return null;
     }
   }

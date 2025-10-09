@@ -319,22 +319,36 @@ async def find_nearby_stores(search_input: NearbySearchInput):
             print(f"❌ Google Places API error: {data.get('status')} - {data.get('error_message', 'Unknown error')}")
             return {"stores": [], "error": f"Google Places API error: {data.get('status')}"}
         
-        # Format the results into a clean list to send back to the app
+        # Format the results and get detailed information for each store
         stores = []
         for place in data.get('results', []):
             location = place.get('geometry', {}).get('location', {})
-            stores.append({
+            
+            # Get basic store info
+            store_data = {
                 "name": place.get('name', 'Unknown Store'),
                 "address": place.get('vicinity', 'Address not available'),
+                "formatted_address": place.get('formatted_address', place.get('vicinity', 'Address not available')),
                 "rating": place.get('rating', 0.0),
+                "user_ratings_total": place.get('user_ratings_total', 0),
                 "isOpen": place.get('opening_hours', {}).get('open_now', False),
                 "latitude": location.get('lat', 0.0),
                 "longitude": location.get('lng', 0.0),
                 "place_id": place.get('place_id', ''),
-                "types": place.get('types', [])
-            })
+                "types": place.get('types', []),
+                "price_level": place.get('price_level'),
+                "photo_reference": None,
+                "photos": []
+            }
+            
+            # Add photo references if available
+            if place.get('photos'):
+                store_data["photo_reference"] = place['photos'][0].get('photo_reference')
+                store_data["photos"] = [photo.get('photo_reference') for photo in place.get('photos', [])[:3]]
+            
+            stores.append(store_data)
         
-        print(f"✅ Found {len(stores)} stores")
+        print(f"✅ Found {len(stores)} stores with detailed information")
         return {"stores": stores, "status": "success"}
 
     except Exception as e:
@@ -388,6 +402,95 @@ async def geocode_address(geocode_input: GeocodeInput):
             "success": False,
             "error": f"Geocoding service error: {str(e)}"
         }
+
+@app.get("/api/v1/store-details/{place_id}")
+async def get_store_details(place_id: str):
+    """
+    Get detailed information about a specific store including reviews, photos, and hours
+    """
+    try:
+        print(f"🏪 Getting details for place_id: {place_id}")
+        
+        # Use Google Places Details API
+        url = "https://maps.googleapis.com/maps/api/place/details/json"
+        params = {
+            'place_id': place_id,
+            'fields': 'name,formatted_address,formatted_phone_number,website,opening_hours,rating,user_ratings_total,reviews,photos,price_level,types',
+            'key': GOOGLE_MAPS_API_KEY
+        }
+        
+        response = http_requests.get(url, params=params)
+        data = response.json()
+        
+        if data.get('status') != 'OK':
+            print(f"❌ Google Places Details API error: {data.get('status')}")
+            return {"details": None, "error": f"Google Places API error: {data.get('status')}"}
+        
+        result = data.get('result', {})
+        
+        # Format the detailed information
+        details = {
+            "name": result.get('name'),
+            "formatted_address": result.get('formatted_address'),
+            "phone_number": result.get('formatted_phone_number'),
+            "website": result.get('website'),
+            "rating": result.get('rating', 0.0),
+            "user_ratings_total": result.get('user_ratings_total', 0),
+            "price_level": result.get('price_level'),
+            "types": result.get('types', []),
+            "opening_hours": result.get('opening_hours', {}).get('weekday_text', []),
+            "reviews": [],
+            "photos": []
+        }
+        
+        # Add reviews
+        if result.get('reviews'):
+            details["reviews"] = [
+                {
+                    "author_name": review.get('author_name'),
+                    "rating": review.get('rating'),
+                    "text": review.get('text'),
+                    "time": review.get('time'),
+                    "relative_time_description": review.get('relative_time_description')
+                }
+                for review in result['reviews'][:5]  # Limit to 5 reviews
+            ]
+        
+        # Add photo references
+        if result.get('photos'):
+            details["photos"] = [
+                photo.get('photo_reference') 
+                for photo in result['photos'][:5]  # Limit to 5 photos
+            ]
+        
+        print(f"✅ Retrieved detailed information for {details['name']}")
+        return {"details": details, "status": "success"}
+        
+    except Exception as e:
+        print(f"❌ Error getting store details: {e}")
+        return {"details": None, "error": str(e)}
+
+@app.get("/api/v1/store-photo/{photo_reference}")
+async def get_store_photo(photo_reference: str, maxwidth: int = 400):
+    """
+    Get a store photo using Google Places Photo API
+    """
+    try:
+        url = "https://maps.googleapis.com/maps/api/place/photo"
+        params = {
+            'photoreference': photo_reference,
+            'maxwidth': maxwidth,
+            'key': GOOGLE_MAPS_API_KEY
+        }
+        
+        # Redirect to Google's photo URL
+        from fastapi.responses import RedirectResponse
+        photo_url = f"{url}?{'&'.join([f'{k}={v}' for k, v in params.items()])}"
+        return RedirectResponse(url=photo_url)
+        
+    except Exception as e:
+        print(f"❌ Error getting store photo: {e}")
+        raise HTTPException(status_code=404, detail="Photo not found")
 
 if __name__ == "__main__":
     import uvicorn

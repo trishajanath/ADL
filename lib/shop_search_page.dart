@@ -6,6 +6,7 @@ import 'dart:convert' as convert;
 import 'dart:async'; // Import for Future
 import 'location_service.dart';
 import 'google_places_service.dart';
+import 'enhanced_store_details_page.dart';
 
 class ShopSearchPage extends StatefulWidget {
   const ShopSearchPage({super.key});
@@ -443,10 +444,12 @@ class _ShopSearchPageState extends State<ShopSearchPage> {
   }
 
   // Helper methods for store actions
-  Future<void> _openGoogleMaps(ConstructionStore store) async {
-    final url = 'https://www.google.com/maps/search/?api=1&query=${store.latitude},${store.longitude}';
+  Future<void> _getDirections(ConstructionStore store) async {
+    final url = 'https://www.google.com/maps/dir/?api=1&destination=${store.latitude},${store.longitude}';
     if (await canLaunchUrl(Uri.parse(url))) {
-      await launchUrl(Uri.parse(url));
+      await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+    } else {
+      _showSnackBar('Could not open directions');
     }
   }
 
@@ -455,8 +458,30 @@ class _ShopSearchPageState extends State<ShopSearchPage> {
       final url = 'tel:${store.phoneNumber}';
       if (await canLaunchUrl(Uri.parse(url))) {
         await launchUrl(Uri.parse(url));
+      } else {
+        _showSnackBar('Could not make phone call');
       }
+    } else {
+      _showSnackBar('Phone number not available for this store');
     }
+  }
+
+  void _viewStoreDetails(ConstructionStore store) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => EnhancedStoreDetailsPage(store: store),
+      ),
+    );
+  }
+
+  void _showSnackBar(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        duration: const Duration(seconds: 2),
+      ),
+    );
   }
 
   String _formatDistance(double distanceKm) {
@@ -762,6 +787,24 @@ class _ShopSearchPageState extends State<ShopSearchPage> {
                                   ),
                                 ),
                                 
+                                // Open status
+                                Container(
+                                  margin: const EdgeInsets.only(left: 8),
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: store.isOpen ? Colors.green.shade50 : Colors.red.shade50,
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: Text(
+                                    store.isOpen ? 'Open' : 'Closed',
+                                    style: TextStyle(
+                                      color: store.isOpen ? Colors.green.shade700 : Colors.red.shade700,
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                                
                                 const Spacer(),
                                 
                                 // Action buttons
@@ -772,9 +815,14 @@ class _ShopSearchPageState extends State<ShopSearchPage> {
                                     tooltip: 'Call store',
                                   ),
                                 IconButton(
-                                  onPressed: () => _openGoogleMaps(store),
+                                  onPressed: () => _getDirections(store),
                                   icon: const Icon(Icons.directions, color: Colors.blue),
                                   tooltip: 'Get directions',
+                                ),
+                                IconButton(
+                                  onPressed: () => _viewStoreDetails(store),
+                                  icon: const Icon(Icons.info, color: Colors.deepPurple),
+                                  tooltip: 'View details',
                                 ),
                               ],
                             ),
