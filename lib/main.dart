@@ -12,6 +12,7 @@ import './store_details_page.dart';
 import './auth_service.dart';
 import './user_profile_page.dart';
 import 'prediction_page.dart';
+import 'shop_search_page.dart';
 
 void main() {
   runApp(const MyApp());
@@ -192,7 +193,7 @@ class _NavigationWrapperState extends State<NavigationWrapper> {
             });
             break;
           case 1:
-            destinationPage = const SearchPage();
+            destinationPage = const ShopSearchPage();
             break;
           case 2:
             destinationPage = const QuestionnairePage();

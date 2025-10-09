@@ -8,11 +8,11 @@ import 'package:flutter/material.dart';
 class ConcretePredictionService {
   // 🔧 DEVELOPMENT CONFIGURATION
   // For testing on same device (simulator/emulator):
-  static const String baseUrl = "http://localhost:8000";
+  // static const String baseUrl = "http://localhost:8000";
   
   // 🌐 NETWORK CONFIGURATION  
-  // For testing on real device (phone), uncomment this line and comment above:
-  // static const String baseUrl = "http://172.20.10.2:8000";
+  // For testing on real device (phone), using local network IP:
+  static const String baseUrl = "http://127.0.0.1:8000";
   
   // Model for prediction request
   static Future<Map<String, dynamic>> predictConcreteGrade({

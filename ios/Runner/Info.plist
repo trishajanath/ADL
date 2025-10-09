@@ -80,5 +80,11 @@
 			</dict>
 		</dict>
 	</dict>
+	
+	<!-- Location permissions -->
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>This app needs location access to find nearby construction supply stores and provide personalized recommendations.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>This app needs location access to find nearby construction supply stores and provide personalized recommendations.</string>
 </dict>
 </plist>

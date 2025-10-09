@@ -40,6 +40,15 @@ dependencies:
   http: ^1.2.1
   flutter_secure_storage: ^9.2.2
   shared_preferences: ^2.2.3
+  
+  # Location services
+  geolocator: ^10.1.0
+  permission_handler: ^11.1.0
+  google_maps_flutter: ^2.5.0
+  geocoding: ^2.1.1
+  
+  # URL launcher
+  url_launcher: ^6.2.1
 
 dev_dependencies:
   flutter_test:

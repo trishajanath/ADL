@@ -10,6 +10,8 @@ import joblib
 import pandas as pd
 import numpy as np
 from typing import Optional
+import googlemaps
+import requests as http_requests
 
 # Load environment variables
 load_dotenv()
@@ -28,6 +30,9 @@ app.add_middleware(
 
 # Use the same Web Client ID from your Flutter app
 GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "137371359979-uteh19od42d7hjal2s75ifcbf8329i5i.apps.googleusercontent.com")
+
+# Google Maps API configuration
+GOOGLE_MAPS_API_KEY = os.getenv("GOOGLE_MAPS_API_KEY", "AIzaSyCzWcYKBQGWFY7uqSp15BN8OKNsaqVJlYY")
 
 # Load ML model components on startup
 print("🔧 Loading ML model components...")
@@ -65,6 +70,14 @@ class PredictionRequest(BaseModel):
     exposure: str
     load_type: str
     built_up_area: Optional[int] = 1000
+
+class NearbySearchInput(BaseModel):
+    query: str
+    latitude: float
+    longitude: float
+
+class GeocodeInput(BaseModel):
+    address: str
 
 @app.get("/")
 def read_root():
@@ -279,6 +292,102 @@ async def get_model_status():
         "feature_count": len(feature_names) if feature_names else 0,
         "available_grades": target_encoder.classes_.tolist() if target_encoder else []
     }
+
+@app.post("/api/v1/nearby-stores")
+async def find_nearby_stores(search_input: NearbySearchInput):
+    """
+    Receives a search query and GPS coordinates from the Flutter app,
+    finds nearby stores using the Google Places API, and returns a list.
+    """
+    try:
+        print(f"🔍 Searching for '{search_input.query}' near {search_input.latitude}, {search_input.longitude}")
+        
+        # Use Google Places API to find nearby stores
+        url = "https://maps.googleapis.com/maps/api/place/nearbysearch/json"
+        params = {
+            'location': f"{search_input.latitude},{search_input.longitude}",
+            'radius': 5000,  # 5km radius
+            'keyword': f"{search_input.query} construction supply building materials hardware",
+            'type': 'store',
+            'key': GOOGLE_MAPS_API_KEY
+        }
+        
+        response = http_requests.get(url, params=params)
+        data = response.json()
+        
+        if data.get('status') != 'OK':
+            print(f"❌ Google Places API error: {data.get('status')} - {data.get('error_message', 'Unknown error')}")
+            return {"stores": [], "error": f"Google Places API error: {data.get('status')}"}
+        
+        # Format the results into a clean list to send back to the app
+        stores = []
+        for place in data.get('results', []):
+            location = place.get('geometry', {}).get('location', {})
+            stores.append({
+                "name": place.get('name', 'Unknown Store'),
+                "address": place.get('vicinity', 'Address not available'),
+                "rating": place.get('rating', 0.0),
+                "isOpen": place.get('opening_hours', {}).get('open_now', False),
+                "latitude": location.get('lat', 0.0),
+                "longitude": location.get('lng', 0.0),
+                "place_id": place.get('place_id', ''),
+                "types": place.get('types', [])
+            })
+        
+        print(f"✅ Found {len(stores)} stores")
+        return {"stores": stores, "status": "success"}
+
+    except Exception as e:
+        print(f"❌ Error in nearby stores search: {e}")
+        return {"stores": [], "error": str(e)}
+
+@app.post("/api/v1/geocode")
+async def geocode_address(geocode_input: GeocodeInput):
+    """
+    Convert an address to GPS coordinates using Google Geocoding API
+    """
+    try:
+        print(f"🗺️ Geocoding address: {geocode_input.address}")
+        
+        # Use Google Geocoding API
+        url = "https://maps.googleapis.com/maps/api/geocode/json"
+        params = {
+            'address': geocode_input.address,
+            'key': GOOGLE_MAPS_API_KEY
+        }
+        
+        response = http_requests.get(url, params=params)
+        data = response.json()
+        
+        if data.get('status') == 'OK' and data.get('results'):
+            result = data['results'][0]
+            location = result['geometry']['location']
+            formatted_address = result['formatted_address']
+            
+            print(f"✅ Geocoded: {geocode_input.address} → {location['lat']}, {location['lng']}")
+            
+            return {
+                "success": True,
+                "location": {
+                    "latitude": location['lat'],
+                    "longitude": location['lng']
+                },
+                "formatted_address": formatted_address,
+                "input_address": geocode_input.address
+            }
+        else:
+            print(f"❌ Geocoding failed: {data.get('status')} - {data.get('error_message', 'No results')}")
+            return {
+                "success": False,
+                "error": f"Could not find location for: {geocode_input.address}"
+            }
+            
+    except Exception as e:
+        print(f"❌ Geocoding error: {e}")
+        return {
+            "success": False,
+            "error": f"Geocoding service error: {str(e)}"
+        }
 
 if __name__ == "__main__":
     import uvicorn
