@@ -277,7 +277,7 @@ class GooglePlacesService {
     int radius = 5000, // 5km radius
   }) async {
     try {
-      print('� Searching via backend API...');
+      print('🔍 Searching via backend API...');
       
       // Call our backend API instead of Google Places directly
       final response = await http.post(

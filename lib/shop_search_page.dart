@@ -27,12 +27,14 @@ class _ShopSearchPageState extends State<ShopSearchPage> {
   /// This is the main function that handles the entire user flow.
   Future<void> _getUserLocationAndSearch() async {
     // --- STEP 1: RESET STATE AND START LOADING ---
-    setState(() {
-      _isLoading = true;
-      _stores = [];
-      _currentPosition = null; // Important: Clear any old position
-      _statusMessage = 'Requesting location permission...';
-    });
+    if (mounted) {
+      setState(() {
+        _isLoading = true;
+        _stores = [];
+        _currentPosition = null; // Important: Clear any old position
+        _statusMessage = 'Requesting location permission...';
+      });
+    }
     print('=== 🎯 AUTOMATIC LOCATION FLOW STARTED ===');
 
     try {
@@ -42,16 +44,20 @@ class _ShopSearchPageState extends State<ShopSearchPage> {
       
       if (!hasPermission) {
         print('❌ Permission Denied by User.');
-        setState(() {
-          _statusMessage = 'Location permission is required to find nearby stores.';
-          _isLoading = false;
-        });
+        if (mounted) {
+          setState(() {
+            _statusMessage = 'Location permission is required to find nearby stores.';
+            _isLoading = false;
+          });
+        }
         return;
       }
 
       // --- STEP 3: GET PRECISE, FRESH LOCATION ---
       print('2️⃣ Permission granted! Getting your precise location...');
-      setState(() => _statusMessage = 'Getting your precise location...');
+      if (mounted) {
+        setState(() => _statusMessage = 'Getting your precise location...');
+      }
       
       // Try multiple location methods for maximum accuracy
       Position position = await _getPreciseLocation();
@@ -66,26 +72,32 @@ class _ShopSearchPageState extends State<ShopSearchPage> {
       // --- STEP 4: HANDLE REAL VS SIMULATOR LOCATION ---
       if (isSimulator) {
         print('🤖 SIMULATOR WORKAROUND: Will show SF stores but inform user');
-        setState(() {
-          _currentPosition = position;
-          _statusMessage = '⚠️ iOS Simulator detected - showing San Francisco area stores.\nOn a real device, this will show stores near your actual location.';
-        });
+        if (mounted) {
+          setState(() {
+            _currentPosition = position;
+            _statusMessage = '⚠️ iOS Simulator detected - showing San Francisco area stores.\nOn a real device, this will show stores near your actual location.';
+          });
+        }
       } else {
         // Real GPS coordinates - proceed with full confidence
-        setState(() {
-          _currentPosition = position;
-          _statusMessage = 'Found your location! Searching for nearby stores...';
-        });
+        if (mounted) {
+          setState(() {
+            _currentPosition = position;
+            _statusMessage = 'Found your location! Searching for nearby stores...';
+          });
+        }
       }
 
       await _searchNearbyStores();
 
     } catch (e) {
       print('❌ FAILED to get location: $e');
-      setState(() {
-        _statusMessage = 'Could not access your location automatically.\nPlease ensure location services are enabled.';
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _statusMessage = 'Could not access your location automatically.\nPlease ensure location services are enabled.';
+          _isLoading = false;
+        });
+      }
       
       // Fallback to manual location after a delay
       Future.delayed(Duration(seconds: 2), () {
@@ -181,10 +193,12 @@ class _ShopSearchPageState extends State<ShopSearchPage> {
 
   /// Geocode an address and search for nearby stores
   Future<void> _geocodeAndSearch(String address) async {
-    setState(() {
-      _isLoading = true;
-      _statusMessage = 'Finding location for: $address...';
-    });
+    if (mounted) {
+      setState(() {
+        _isLoading = true;
+        _statusMessage = 'Finding location for: $address...';
+      });
+    }
 
     try {
       print('🗺️ GEOCODING: Converting address "$address" to coordinates');
@@ -204,38 +218,44 @@ class _ShopSearchPageState extends State<ShopSearchPage> {
           
           print('✅ GEOCODED: $address → $lat, $lng');
           
-          setState(() {
-            _currentPosition = Position(
-              latitude: lat,
-              longitude: lng,
-              timestamp: DateTime.now(),
-              accuracy: 5.0,
-              altitude: 0,
-              heading: 0,
-              speed: 0,
-              speedAccuracy: 0,
-              altitudeAccuracy: 0,
-              headingAccuracy: 0,
-            );
-            _statusMessage = 'Found location: $address\nSearching for stores...';
-          });
+          if (mounted) {
+            setState(() {
+              _currentPosition = Position(
+                latitude: lat,
+                longitude: lng,
+                timestamp: DateTime.now(),
+                accuracy: 5.0,
+                altitude: 0,
+                heading: 0,
+                speed: 0,
+                speedAccuracy: 0,
+                altitudeAccuracy: 0,
+                headingAccuracy: 0,
+              );
+              _statusMessage = 'Found location: $address\nSearching for stores...';
+            });
+          }
 
           await _searchNearbyStores();
         } else {
-          setState(() {
-            _statusMessage = 'Could not find location for: $address\nTry a more specific address.';
-            _isLoading = false;
-          });
+          if (mounted) {
+            setState(() {
+              _statusMessage = 'Could not find location for: $address\nTry a more specific address.';
+              _isLoading = false;
+            });
+          }
         }
       } else {
         throw Exception('Geocoding service unavailable');
       }
     } catch (e) {
       print('❌ GEOCODING FAILED: $e');
-      setState(() {
-        _statusMessage = 'Error finding location. Please try again or select a city.';
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _statusMessage = 'Error finding location. Please try again or select a city.';
+          _isLoading = false;
+        });
+      }
     }
   }
 
