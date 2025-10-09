@@ -2,6 +2,10 @@ import 'package:flutter/material.dart';
 import 'concrete_prediction_service.dart';
 
 class PredictionPage extends StatefulWidget {
+  final String category; // "Residential" or "Commercial"
+  
+  const PredictionPage({Key? key, required this.category}) : super(key: key);
+
   @override
   _PredictionPageState createState() => _PredictionPageState();
 }
@@ -13,58 +17,198 @@ class _PredictionPageState extends State<PredictionPage> {
   // Form data storage
   final Map<String, dynamic> _formData = {};
   
-  // Question data based on Customer_Questionnaire.pdf
-  final List<Map<String, dynamic>> _questions = [
+  // Residential questions based on your PDF
+  final List<Map<String, dynamic>> _residentialQuestions = [
     {
       'id': 'building_type',
-      'title': 'What type of building are you constructing?',
+      'title': 'What type of residential building are you constructing?',
       'type': 'dropdown',
-      'options': ['House', 'Commercial', 'Apartment', 'Industrial'],
+      'options': ['Independent house', 'Duplex', 'Villa', 'Apartment (small-scale)'],
       'required': true,
     },
     {
       'id': 'floors',
-      'title': 'How many floors will your building have?',
+      'title': 'How many floors (including ground)?',
       'type': 'dropdown',
       'options': ['G', 'G+1', 'G+2', 'G+3', 'G+4', 'G+5', 'G+6+'],
       'required': true,
     },
     {
       'id': 'built_up_area',
-      'title': 'What is the built-up area? (in sq. ft.)',
+      'title': 'What is the total built-up area?',
       'type': 'number',
-      'placeholder': 'Enter area in square feet',
+      'placeholder': 'Enter area in sq.ft or m²',
+      'required': true,
+    },
+    {
+      'id': 'room_count',
+      'title': 'How many rooms do you plan?',
+      'type': 'number',
+      'placeholder': 'Enter approximate count',
+      'required': true,
+    },
+    {
+      'id': 'location',
+      'title': 'Where is your site located?',
+      'type': 'text',
+      'placeholder': 'Enter pincode or GPS location',
+      'required': true,
+    },
+    {
+      'id': 'terrain_type',
+      'title': 'What is the terrain type?',
+      'type': 'dropdown',
+      'options': ['Flat', 'Sloped', 'Hilly'],
       'required': true,
     },
     {
       'id': 'soil_type',
-      'title': 'What type of soil is at your construction site?',
+      'title': 'What is the soil type?',
       'type': 'dropdown',
-      'options': ['Any', 'Clay', 'Sandy', 'Rocky', 'Black Cotton', 'Alluvial'],
+      'options': ['Sandy', 'Clayey', 'Rocky', 'Mixed'],
+      'required': true,
+    },
+    {
+      'id': 'exposure_condition',
+      'title': 'Is your site in a special exposure condition?',
+      'type': 'dropdown',
+      'options': ['Normal', 'Coastal', 'Flood-prone', 'High rainfall'],
       'required': true,
     },
     {
       'id': 'seismic_zone',
-      'title': 'Which seismic zone is your location in?',
+      'title': 'Do you know the seismic zone of your location?',
       'type': 'dropdown',
-      'options': ['Zone I', 'Zone II', 'Zone III', 'Zone IV', 'Zone V'],
+      'options': ['Zone II', 'Zone III', 'Zone IV', 'Zone V', 'Not sure'],
       'required': true,
     },
     {
-      'id': 'exposure',
-      'title': 'What is the exposure condition of your building?',
+      'id': 'roof_type',
+      'title': 'Will your roof be plain, garden, or have solar panels?',
       'type': 'dropdown',
-      'options': ['Mild', 'Moderate', 'Severe', 'Very Severe', 'Extreme'],
+      'options': ['Plain roof', 'Garden roof', 'Solar panels', 'Multiple options'],
       'required': true,
     },
     {
       'id': 'load_type',
-      'title': 'What type of loads will the building carry?',
+      'title': 'Will there be heavy loads or only household loads?',
       'type': 'dropdown',
-      'options': ['Regular Household', 'Heavy Machinery', 'Storage/Warehouse', 'Office/Commercial', 'Light Industrial'],
+      'options': ['Only household loads', 'Vehicle parking', 'Heavy machinery', 'Mixed loads'],
+      'required': true,
+    },
+    {
+      'id': 'basement_needed',
+      'title': 'Do you need a basement or underground tank?',
+      'type': 'dropdown',
+      'options': ['No', 'Basement only', 'Underground tank only', 'Both'],
+      'required': true,
+    },
+    {
+      'id': 'waterlogging',
+      'title': 'Is waterlogging an issue in your area?',
+      'type': 'dropdown',
+      'options': ['No', 'Yes, occasionally', 'Yes, frequently'],
+      'required': true,
+    },
+    {
+      'id': 'budget_per_sqft',
+      'title': 'What is your expected construction budget per sq.ft?',
+      'type': 'number',
+      'placeholder': 'Enter budget in ₹ per sq.ft',
+      'required': false,
+    },
+    {
+      'id': 'material_preference',
+      'title': 'Do you prefer eco-friendly or traditional materials?',
+      'type': 'dropdown',
+      'options': ['Traditional materials', 'Eco-friendly materials', 'No preference'],
+      'required': false,
+    },
+    {
+      'id': 'cost_priority',
+      'title': 'Do you want only low-cost material options?',
+      'type': 'dropdown',
+      'options': ['No', 'Yes, low-cost priority', 'Balanced approach'],
+      'required': false,
+    },
+  ];
+
+  // Commercial questions based on your PDF
+  final List<Map<String, dynamic>> _commercialQuestions = [
+    {
+      'id': 'building_type',
+      'title': 'Type of commercial building',
+      'type': 'dropdown',
+      'options': ['Office', 'Mall', 'Hospital', 'School', 'Warehouse'],
+      'required': true,
+    },
+    {
+      'id': 'floors',
+      'title': 'Number of floors / stories',
+      'type': 'dropdown',
+      'options': ['G', 'G+1', 'G+2', 'G+3', 'G+4', 'G+5', 'G+6+'],
+      'required': true,
+    },
+    {
+      'id': 'built_up_area',
+      'title': 'What is the total built-up area?',
+      'type': 'number',
+      'placeholder': 'Enter area in sq.ft or m²',
+      'required': true,
+    },
+    {
+      'id': 'expected_loads',
+      'title': 'Expected live loads',
+      'type': 'dropdown',
+      'options': ['Light equipment', 'Heavy equipment', 'High foot traffic', 'Vehicle parking', 'Mixed loads'],
+      'required': true,
+    },
+    {
+      'id': 'fire_resistance',
+      'title': 'Fire resistance / durability requirements',
+      'type': 'dropdown',
+      'options': ['Standard', 'Enhanced', 'High-grade', 'Maximum'],
+      'required': true,
+    },
+    {
+      'id': 'parking_levels',
+      'title': 'Basement or multi-level parking?',
+      'type': 'dropdown',
+      'options': ['No', 'Single basement', 'Multi-level basement', 'Ground level only'],
+      'required': true,
+    },
+    {
+      'id': 'location',
+      'title': 'Where is your site located?',
+      'type': 'text',
+      'placeholder': 'Enter pincode or GPS location',
+      'required': true,
+    },
+    {
+      'id': 'soil_type',
+      'title': 'What is the soil type?',
+      'type': 'dropdown',
+      'options': ['Sandy', 'Clayey', 'Rocky', 'Mixed'],
+      'required': true,
+    },
+    {
+      'id': 'seismic_zone',
+      'title': 'Do you know the seismic zone of your location?',
+      'type': 'dropdown',
+      'options': ['Zone II', 'Zone III', 'Zone IV', 'Zone V', 'Not sure'],
+      'required': true,
+    },
+    {
+      'id': 'exposure_condition',
+      'title': 'Is your site in a special exposure condition?',
+      'type': 'dropdown',
+      'options': ['Normal', 'Coastal', 'Flood-prone', 'High rainfall'],
       'required': true,
     },
   ];
+
+  List<Map<String, dynamic>> get _questions => 
+    widget.category.toLowerCase() == 'residential' ? _residentialQuestions : _commercialQuestions;
 
   bool _isLoading = false;
 
@@ -134,15 +278,18 @@ class _PredictionPageState extends State<PredictionPage> {
         throw Exception('Cannot connect to prediction service. Please ensure the backend server is running.');
       }
 
+      // Map form data to API format
+      Map<String, dynamic> apiData = _mapFormDataToAPI();
+
       // Make prediction
       final result = await ConcretePredictionService.predictConcreteGrade(
-        buildingType: _formData['building_type'],
-        floors: _formData['floors'],
-        soilType: _formData['soil_type'],
-        seismicZone: _formData['seismic_zone'],
-        exposure: _formData['exposure'],
-        loadType: _formData['load_type'],
-        builtUpArea: int.parse(_formData['built_up_area'].toString()),
+        buildingType: apiData['building_type'],
+        floors: apiData['floors'],
+        soilType: apiData['soil_type'],
+        seismicZone: apiData['seismic_zone'],
+        exposure: apiData['exposure'],
+        loadType: apiData['load_type'],
+        builtUpArea: apiData['built_up_area'],
       );
 
       setState(() {
@@ -159,6 +306,97 @@ class _PredictionPageState extends State<PredictionPage> {
 
       _showErrorDialog(e.toString());
     }
+  }
+
+  Map<String, dynamic> _mapFormDataToAPI() {
+    // Map the detailed questionnaire data to the simpler API format
+    Map<String, dynamic> apiData = {};
+    
+    // Building type mapping
+    if (_formData['building_type'] != null) {
+      String buildingType = _formData['building_type'];
+      if (widget.category.toLowerCase() == 'residential') {
+        // Map residential building types to API format
+        if (buildingType.contains('house') || buildingType.contains('House')) {
+          apiData['building_type'] = 'House';
+        } else if (buildingType.contains('Apartment') || buildingType.contains('apartment')) {
+          apiData['building_type'] = 'Apartment';
+        } else if (buildingType.contains('Villa') || buildingType.contains('villa')) {
+          apiData['building_type'] = 'House'; // Villa maps to House
+        } else if (buildingType.contains('Duplex') || buildingType.contains('duplex')) {
+          apiData['building_type'] = 'House'; // Duplex maps to House
+        } else {
+          apiData['building_type'] = 'House'; // Default for residential
+        }
+      } else {
+        // Commercial building types
+        apiData['building_type'] = 'Commercial';
+      }
+    }
+    
+    // Floors mapping
+    apiData['floors'] = _formData['floors'] ?? 'G+2';
+    
+    // Built-up area
+    apiData['built_up_area'] = int.tryParse(_formData['built_up_area']?.toString() ?? '1500') ?? 1500;
+    
+    // Soil type mapping
+    String soilType = _formData['soil_type'] ?? 'Mixed';
+    if (soilType == 'Clayey') {
+      apiData['soil_type'] = 'Clay';
+    } else if (soilType == 'Sandy') {
+      apiData['soil_type'] = 'Sandy'; 
+    } else if (soilType == 'Rocky') {
+      apiData['soil_type'] = 'Rocky';
+    } else {
+      apiData['soil_type'] = 'Any'; // Mixed or other maps to Any
+    }
+    
+    // Seismic zone mapping
+    String seismicZone = _formData['seismic_zone'] ?? 'Zone III';
+    if (seismicZone == 'Not sure') {
+      apiData['seismic_zone'] = 'Zone III'; // Default
+    } else {
+      apiData['seismic_zone'] = seismicZone;
+    }
+    
+    // Exposure condition mapping
+    String exposure = _formData['exposure_condition'] ?? 'Normal';
+    if (exposure == 'Normal') {
+      apiData['exposure'] = 'Moderate';
+    } else if (exposure == 'Coastal') {
+      apiData['exposure'] = 'Severe';
+    } else if (exposure == 'Flood-prone' || exposure == 'High rainfall') {
+      apiData['exposure'] = 'Very Severe';
+    } else {
+      apiData['exposure'] = 'Moderate';
+    }
+    
+    // Load type mapping
+    if (widget.category.toLowerCase() == 'residential') {
+      String loadType = _formData['load_type'] ?? 'Only household loads';
+      if (loadType.contains('household') || loadType.contains('Only')) {
+        apiData['load_type'] = 'Regular Household';
+      } else if (loadType.contains('Heavy machinery')) {
+        apiData['load_type'] = 'Heavy Machinery';
+      } else if (loadType.contains('Vehicle parking')) {
+        apiData['load_type'] = 'Light Industrial';
+      } else {
+        apiData['load_type'] = 'Regular Household';
+      }
+    } else {
+      // Commercial load mapping
+      String expectedLoads = _formData['expected_loads'] ?? 'Light equipment';
+      if (expectedLoads.contains('Heavy equipment')) {
+        apiData['load_type'] = 'Heavy Machinery';
+      } else if (expectedLoads.contains('Vehicle parking')) {
+        apiData['load_type'] = 'Light Industrial';
+      } else {
+        apiData['load_type'] = 'Office/Commercial';
+      }
+    }
+    
+    return apiData;
   }
 
   void _showResultsDialog(Map<String, dynamic> result) {
@@ -337,6 +575,8 @@ class _PredictionPageState extends State<PredictionPage> {
         return _buildDropdownInput(question);
       case 'number':
         return _buildNumberInput(question);
+      case 'text':
+        return _buildTextInput(question);
       default:
         return Container();
     }
@@ -392,6 +632,43 @@ class _PredictionPageState extends State<PredictionPage> {
     );
   }
 
+  Widget _buildTextInput(Map<String, dynamic> question) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        TextFormField(
+          keyboardType: TextInputType.text,
+          style: TextStyle(fontSize: 18),
+          decoration: InputDecoration(
+            hintText: question['placeholder'],
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: Colors.grey[300]!),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: Colors.blue, width: 2),
+            ),
+            contentPadding: EdgeInsets.all(16),
+          ),
+          onChanged: (value) {
+            setState(() {
+              _formData[question['id']] = value;
+            });
+          },
+          initialValue: _formData[question['id']]?.toString(),
+        ),
+        SizedBox(height: 16),
+        Text(
+          question['id'] == 'location' 
+            ? 'Enter your pincode, GPS coordinates, or nearby landmark.'
+            : 'Provide additional details as needed.',
+          style: TextStyle(color: Colors.grey[600], fontSize: 14),
+        ),
+      ],
+    );
+  }
+
   Widget _buildNumberInput(Map<String, dynamic> question) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -410,7 +687,8 @@ class _PredictionPageState extends State<PredictionPage> {
               borderSide: BorderSide(color: Colors.blue, width: 2),
             ),
             contentPadding: EdgeInsets.all(16),
-            suffixText: 'sq. ft.',
+            suffixText: question['id'] == 'built_up_area' ? 'sq. ft.' : 
+                       question['id'] == 'budget_per_sqft' ? '₹' : null,
           ),
           onChanged: (value) {
             setState(() {
@@ -421,7 +699,13 @@ class _PredictionPageState extends State<PredictionPage> {
         ),
         SizedBox(height: 16),
         Text(
-          'Enter the total built-up area of your building in square feet.',
+          question['id'] == 'built_up_area' 
+            ? 'Enter the total built-up area of your building in square feet.'
+            : question['id'] == 'room_count'
+            ? 'Include bedrooms, living rooms, kitchen, bathrooms, etc.'
+            : question['id'] == 'budget_per_sqft'
+            ? 'Optional: Enter your expected budget per square foot in rupees.'
+            : 'Enter the required numeric value.',
           style: TextStyle(color: Colors.grey[600], fontSize: 14),
         ),
       ],
@@ -430,9 +714,14 @@ class _PredictionPageState extends State<PredictionPage> {
 
   @override
   Widget build(BuildContext context) {
+    // Debug print to verify category
+    print('🔍 PredictionPage: Category = "${widget.category}"');
+    print('🔍 Questions count: ${_questions.length}');
+    print('🔍 Is Residential: ${widget.category.toLowerCase() == 'residential'}');
+    
     return Scaffold(
       appBar: AppBar(
-        title: Text('Building Questionnaire'),
+        title: Text('${widget.category.isNotEmpty ? widget.category[0].toUpperCase() + widget.category.substring(1) : "Building"} Questionnaire'),
         backgroundColor: Colors.white,
         foregroundColor: Colors.black,
         elevation: 0,

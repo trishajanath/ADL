@@ -704,7 +704,7 @@ class QuestionnairePage extends StatelessWidget {
                 ),
                 const SizedBox(height: 32),
                 Text(
-                  'AI-Powered Building Analysis',
+                  '${NavigationState.selectedCategory.isNotEmpty ? NavigationState.selectedCategory[0].toUpperCase() + NavigationState.selectedCategory.substring(1) : "Building"} Analysis',
                   style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                         fontWeight: FontWeight.bold,
                         color: const Color(0xFF1E3A8A),
@@ -713,7 +713,7 @@ class QuestionnairePage extends StatelessWidget {
                 ),
                 const SizedBox(height: 16),
                 Text(
-                  'Get professional concrete grade recommendations for your construction project using our advanced machine learning system.',
+                  'Get professional concrete grade recommendations for your ${NavigationState.selectedCategory.toLowerCase()} construction project using our advanced machine learning system.',
                   style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                         color: Colors.grey[600],
                         height: 1.5,
@@ -749,15 +749,22 @@ class QuestionnairePage extends StatelessWidget {
                   width: double.infinity,
                   child: ElevatedButton.icon(
                     onPressed: () {
+                      // Get the selected category from NavigationState
+                      String selectedCategory = NavigationState.selectedCategory;
+                      if (selectedCategory.isEmpty) {
+                        // Fallback - should not happen if navigation is working correctly
+                        selectedCategory = 'residential';
+                      }
+                      
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (context) => PredictionPage(),
+                          builder: (context) => PredictionPage(category: selectedCategory),
                         ),
                       );
                     },
                     icon: Icon(Icons.rocket_launch),
-                    label: Text('Start AI Analysis'),
+                    label: Text('Start ${NavigationState.selectedCategory.isNotEmpty ? NavigationState.selectedCategory[0].toUpperCase() + NavigationState.selectedCategory.substring(1) : "Building"} Analysis'),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.blue,
                       foregroundColor: Colors.white,
@@ -773,7 +780,11 @@ class QuestionnairePage extends StatelessWidget {
                 const SizedBox(height: 16),
                 
                 Text(
-                  '7 quick questions • 2 minute analysis',
+                  NavigationState.selectedCategory.toLowerCase() == 'residential' 
+                    ? '16 detailed questions • 3-4 minute analysis'
+                    : NavigationState.selectedCategory.toLowerCase() == 'commercial'
+                    ? '10 focused questions • 2-3 minute analysis'
+                    : 'Quick questions • 2-3 minute analysis',
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
                         color: Colors.grey[500],
                       ),
