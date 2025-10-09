@@ -1,0 +1,31 @@
+feature,importance
+Floor_Number,0.2362627962260317
+Seismic_Zone_Zone II,0.06736091035988737
+Building_Type_Apartment,0.06719522130225038
+Load_Type_Regular+Parking,0.06684937690719342
+Seismic_Zone_Zone III,0.0646484500821993
+Exposure_Mild,0.06462878382451592
+Building_Type_House,0.0637678524755393
+Seismic_Zone_Zone III/IV,0.05038676011810687
+Exposure_Moderate,0.03392929075219761
+Building_Type_School,0.03188132146731411
+Building_Type_Mall,0.03137678372352286
+Load_Type_Regular Household,0.030694772416975935
+Building_Type_Hospital,0.02124000019588257
+Exposure_Very Severe,0.020672435341479514
+Seismic_Zone_Zone IV/V,0.01974815912175793
+Seismic_Zone_Zone IV,0.019520841903194846
+Soil_Type_Mixed,0.01825260234299136
+Exposure_Severe,0.016672964849283416
+Soil_Type_Coastal Soil,0.015708335524125004
+Load_Type_Heavy Equipment,0.014365010946907494
+Load_Type_Heavy Load,0.014046598386871724
+Load_Type_Heavy+Parking,0.012735668814616186
+Soil_Type_Any,0.010525514340731734
+Building_Type_Villa,0.007529548576423578
+Exposure_Extreme,0.0
+Seismic_Zone_Zone V,0.0
+Building_Type_Office,0.0
+Seismic_Zone_Zone II/III,0.0
+Soil_Type_Rocky,0.0
+Load_Type_Regular+Solar Roof,0.0

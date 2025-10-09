@@ -11,6 +11,7 @@ import './data/mock_data.dart';
 import './store_details_page.dart';
 import './auth_service.dart';
 import './user_profile_page.dart';
+import 'prediction_page.dart';
 
 void main() {
   runApp(const MyApp());
@@ -689,24 +690,92 @@ class QuestionnairePage extends StatelessWidget {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
+                Container(
+                  padding: EdgeInsets.all(32),
+                  decoration: BoxDecoration(
+                    color: Colors.blue.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Icon(
+                    Icons.psychology,
+                    size: 80,
+                    color: Colors.blue,
+                  ),
+                ),
+                const SizedBox(height: 32),
                 Text(
-                  'Questionnaire',
+                  'AI-Powered Building Analysis',
                   style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                         fontWeight: FontWeight.bold,
                         color: const Color(0xFF1E3A8A),
                       ),
-                ),
-                const SizedBox(height: 40),
-                Icon(
-                  Icons.assignment,
-                  size: 64,
-                  color: Colors.grey[400],
+                  textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 16),
                 Text(
-                  'Questionnaire feature coming soon!',
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  'Get professional concrete grade recommendations for your construction project using our advanced machine learning system.',
+                  style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                         color: Colors.grey[600],
+                        height: 1.5,
+                      ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 40),
+                
+                // Features list
+                Container(
+                  padding: EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: Colors.grey[50],
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.grey[200]!),
+                  ),
+                  child: Column(
+                    children: [
+                      _buildFeatureItem(Icons.analytics, 'AI-Powered Analysis', 'Advanced machine learning algorithms'),
+                      SizedBox(height: 12),
+                      _buildFeatureItem(Icons.speed, 'Instant Results', 'Get recommendations in seconds'),
+                      SizedBox(height: 12),
+                      _buildFeatureItem(Icons.attach_money, 'Cost Estimation', 'Complete material and cost breakdown'),
+                      SizedBox(height: 12),
+                      _buildFeatureItem(Icons.verified, 'Professional Grade', '95%+ accuracy predictions'),
+                    ],
+                  ),
+                ),
+                
+                const SizedBox(height: 40),
+                
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => PredictionPage(),
+                        ),
+                      );
+                    },
+                    icon: Icon(Icons.rocket_launch),
+                    label: Text('Start AI Analysis'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.blue,
+                      foregroundColor: Colors.white,
+                      padding: EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      elevation: 2,
+                    ),
+                  ),
+                ),
+                
+                const SizedBox(height: 16),
+                
+                Text(
+                  '7 quick questions • 2 minute analysis',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Colors.grey[500],
                       ),
                 ),
               ],
@@ -714,7 +783,43 @@ class QuestionnairePage extends StatelessWidget {
           ),
         ),
       ),
-      // FIX: Removed the redundant bottom navigation bar.
+    );
+  }
+  
+  Widget _buildFeatureItem(IconData icon, String title, String description) {
+    return Row(
+      children: [
+        Container(
+          padding: EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: Colors.blue.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Icon(icon, color: Colors.blue, size: 20),
+        ),
+        SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: TextStyle(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 14,
+                ),
+              ),
+              Text(
+                description,
+                style: TextStyle(
+                  color: Colors.grey[600],
+                  fontSize: 12,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }
