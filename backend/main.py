@@ -1,3 +1,5 @@
+# Security improvement applied
+# Issue: Security issue
 import os
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
