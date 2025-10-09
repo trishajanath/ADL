@@ -1,0 +1,10 @@
+Member_Type,Length_m,Breadth_m,Depth_m,Volume_Cum,Grade,RMC_Rate_perCum,Total_Cost
+Roof Beam (Ground Floor),15.833,0.666,1.5,63.269,M25,5700,360633.3
+Roof Beam (Ground Floor),16.33,0.666,1.5,65.255,M25,5700,371953.5
+Roof Slab (Ground Floor),16.333,11.0,0.416,298.96,M25,5700,1704071.9999999998
+Column (Ground Floor),0.666,1.25,11.5,9.57,M30,6100,58377.0
+Column (Ground Floor),0.666,1.25,11.5,9.57,M30,6100,58377.0
+Lintel (Ground Floor),15.833,0.666,0.333,14.046,M25,5700,80062.2
+Staircase (Ground Floor),4.25,3.5,0.5,7.44,M25,5700,42408.0
+Roof Slab (First Floor),21.666,10.0,0.375,324.99,M25,5700,1852443.0
+Column (First Floor),0.666,1.25,11.5,9.49,M30,6100,57889.0

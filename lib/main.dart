@@ -16,6 +16,25 @@ void main() {
   runApp(const MyApp());
 }
 
+// Global state to track if navigation should be shown
+class NavigationState {
+  static bool _hasSelectedCategory = false;
+  static String _selectedCategory = '';
+  
+  static bool get hasSelectedCategory => _hasSelectedCategory;
+  static String get selectedCategory => _selectedCategory;
+  
+  static void setCategory(String category) {
+    _hasSelectedCategory = true;
+    _selectedCategory = category;
+  }
+  
+  static void reset() {
+    _hasSelectedCategory = false;
+    _selectedCategory = '';
+  }
+}
+
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
@@ -47,23 +66,37 @@ class MainScreen extends StatefulWidget {
 
 class _MainScreenState extends State<MainScreen> {
   int _currentIndex = 0;
+  bool _hasSelectedCategory = false; // Track if user has selected residential/commercial
 
   // List of the main pages accessible from the bottom navigation bar.
-  final List<Widget> _screens = [
-    const HomePage(),
+  List<Widget> get _screens => [
+    HomePage(onCategorySelected: _onCategorySelected),
     const SearchPage(),
     const QuestionnairePage(),
     const FavoritesPage(),
     const ProfilePage(), // The router page for login/profile
   ];
 
+  void _onCategorySelected(String category) {
+    setState(() {
+      _hasSelectedCategory = true;
+      NavigationState.setCategory(category);
+    });
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    // Check if category was already selected
+    _hasSelectedCategory = NavigationState.hasSelectedCategory;
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       body: _screens[_currentIndex],
-      // FIX: The Bottom Navigation Bar is now centralized here. This is the single
-      // source of truth for main navigation in the app.
-      bottomNavigationBar: Container(
+      // Only show bottom navigation bar after category selection
+      bottomNavigationBar: _hasSelectedCategory ? Container(
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: const BorderRadius.only(
@@ -93,7 +126,7 @@ class _MainScreenState extends State<MainScreen> {
             ),
           ),
         ),
-      ),
+      ) : null,
     );
   }
 
@@ -128,10 +161,128 @@ class _MainScreenState extends State<MainScreen> {
   }
 }
 
+// Navigation wrapper that can be used on any page
+class NavigationWrapper extends StatefulWidget {
+  final Widget child;
+  final int? currentIndex;
+  
+  const NavigationWrapper({
+    super.key, 
+    required this.child,
+    this.currentIndex,
+  });
+
+  @override
+  State<NavigationWrapper> createState() => _NavigationWrapperState();
+}
+
+class _NavigationWrapperState extends State<NavigationWrapper> {
+  Widget _buildNavItem(IconData icon, String label, int index) {
+    final bool isActive = widget.currentIndex == index;
+    return GestureDetector(
+      onTap: () {
+        // Navigate to the appropriate page using Navigator.pushReplacement
+        // to maintain the navigation state
+        Widget destinationPage;
+        switch (index) {
+          case 0:
+            destinationPage = HomePage(onCategorySelected: (category) {
+              NavigationState.setCategory(category);
+            });
+            break;
+          case 1:
+            destinationPage = const SearchPage();
+            break;
+          case 2:
+            destinationPage = const QuestionnairePage();
+            break;
+          case 3:
+            destinationPage = const FavoritesPage();
+            break;
+          case 4:
+            destinationPage = const ProfilePage();
+            break;
+          default:
+            destinationPage = HomePage(onCategorySelected: (category) {
+              NavigationState.setCategory(category);
+            });
+        }
+        
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(
+            builder: (context) => NavigationWrapper(
+              child: destinationPage,
+              currentIndex: index,
+            ),
+          ),
+        );
+      },
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            icon,
+            color: isActive ? const Color(0xFF1E3A8A) : Colors.grey[600],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            label,
+            style: TextStyle(
+              color: isActive ? const Color(0xFF1E3A8A) : Colors.grey[600],
+              fontWeight: isActive ? FontWeight.bold : FontWeight.w500,
+              fontSize: 12,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: widget.child,
+      bottomNavigationBar: NavigationState.hasSelectedCategory ? Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: const BorderRadius.only(
+            topLeft: Radius.circular(20),
+            topRight: Radius.circular(20),
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.1),
+              blurRadius: 10,
+              offset: const Offset(0, -2),
+            ),
+          ],
+        ),
+        child: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: [
+                _buildNavItem(Icons.home, 'Home', 0),
+                _buildNavItem(Icons.search, 'Search', 1),
+                _buildNavItem(Icons.help_outline, 'Questionnaire', 2),
+                _buildNavItem(Icons.favorite_border, 'Favorites', 3),
+                _buildNavItem(Icons.person, 'Profile', 4),
+              ],
+            ),
+          ),
+        ),
+      ) : null,
+    );
+  }
+}
+
 // --- PAGE WIDGETS (CLEANED) ---
 
 class HomePage extends StatefulWidget {
-  const HomePage({super.key});
+  final Function(String)? onCategorySelected;
+  
+  const HomePage({super.key, this.onCategorySelected});
 
   @override
   State<HomePage> createState() => _HomePageState();
@@ -166,13 +317,17 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
 
   void _navigateToResidential() {
     HapticFeedback.lightImpact();
+    // Call the callback to enable bottom navigation
+    widget.onCategorySelected?.call('residential');
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (context) => const PremierConstructionPage(
-          title: 'Residential Construction',
-          tagline:
-              'Building dream homes with exceptional craftsmanship and attention to detail since 1999.',
-          type: 'residential',
+        builder: (context) => const NavigationWrapper(
+          child: PremierConstructionPage(
+            title: 'Residential Construction',
+            tagline:
+                'Building dream homes with exceptional craftsmanship and attention to detail since 1999.',
+            type: 'residential',
+          ),
         ),
       ),
     );
@@ -180,13 +335,17 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
 
   void _navigateToCommercial() {
     HapticFeedback.lightImpact();
+    // Call the callback to enable bottom navigation
+    widget.onCategorySelected?.call('commercial');
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (context) => const PremierConstructionPage(
-          title: 'Commercial Construction',
-          tagline:
-              'Delivering exceptional commercial projects with precision and innovation since 1999.',
-          type: 'commercial',
+        builder: (context) => const NavigationWrapper(
+          child: PremierConstructionPage(
+            title: 'Commercial Construction',
+            tagline:
+                'Delivering exceptional commercial projects with precision and innovation since 1999.',
+            type: 'commercial',
+          ),
         ),
       ),
     );

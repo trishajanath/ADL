@@ -1,0 +1,11 @@
+Building_Type,Floors,Soil_Type,Seismic_Zone,Exposure,Load_Type,Recommended_Grade
+House,G+1,Any,Zone II,Mild,Regular Household,M20
+House,G+2,Any,Zone II/III,Moderate,Regular Household,M25
+Apartment,G+3,Any,Zone III,Moderate,Regular+Parking,M25
+Apartment,G+4,Any,Zone III/IV,Severe,Heavy Load,M30
+Villa,G+2,Coastal Soil,Zone III/IV,Severe,Regular Household,M30
+Villa,G+3,Coastal Soil,Zone IV,Very Severe,Regular+Solar Roof,M35
+Hospital,G+5,Mixed,Zone IV,Severe,Heavy Equipment,M35
+School,G+4,Any,Zone III,Moderate,Regular+Parking,M30
+Office,G+10,Rocky,Zone V,Extreme,Heavy+Parking,M40
+Mall,G+8,Any,Zone IV/V,Very Severe,Heavy+Parking,M35
