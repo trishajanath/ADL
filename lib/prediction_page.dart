@@ -1,10 +1,16 @@
 import 'package:flutter/material.dart';
 import 'concrete_prediction_service.dart';
+import 'scan_storage.dart';
 
 class PredictionPage extends StatefulWidget {
   final String category; // "Residential" or "Commercial"
+  final ScanResult? existingScan; // For editing existing scans
   
-  const PredictionPage({Key? key, required this.category}) : super(key: key);
+  const PredictionPage({
+    Key? key, 
+    required this.category, 
+    this.existingScan,
+  }) : super(key: key);
 
   @override
   _PredictionPageState createState() => _PredictionPageState();
@@ -218,6 +224,20 @@ class _PredictionPageState extends State<PredictionPage> {
     // Initialize form data with empty values
     for (var question in _questions) {
       _formData[question['id']] = null;
+    }
+    
+    // If editing an existing scan, populate the form data
+    if (widget.existingScan != null) {
+      _loadExistingScanData();
+    }
+  }
+
+  void _loadExistingScanData() {
+    final scan = widget.existingScan!;
+    
+    // Map the scan data back to form fields from questionnaireData
+    if (scan.questionnaireData.isNotEmpty) {
+      _formData.addAll(scan.questionnaireData);
     }
   }
 
@@ -440,12 +460,167 @@ class _PredictionPageState extends State<PredictionPage> {
             child: Text('New Prediction'),
           ),
           ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _showSaveDialog(result);
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.green,
+              foregroundColor: Colors.white,
+            ),
+            child: Text('Save Scan'),
+          ),
+          ElevatedButton(
             onPressed: () => Navigator.pop(context),
             child: Text('Done'),
           ),
         ],
       ),
     );
+  }
+
+  void _showSaveDialog(Map<String, dynamic> result) {
+    String projectName = widget.existingScan?.projectName ?? _generateDefaultProjectName();
+    final TextEditingController nameController = TextEditingController(text: projectName);
+    
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Row(
+          children: [
+            Icon(widget.existingScan != null ? Icons.edit : Icons.save, color: Colors.blue),
+            SizedBox(width: 8),
+            Text(widget.existingScan != null ? 'Update Scan' : 'Save Scan'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(widget.existingScan != null 
+              ? 'Update your scan name:' 
+              : 'Give your scan a name for easy reference:'
+            ),
+            SizedBox(height: 16),
+            TextField(
+              controller: nameController,
+              decoration: InputDecoration(
+                labelText: 'Project Name',
+                hintText: 'e.g., My Dream House, Office Building',
+                border: OutlineInputBorder(),
+                prefixIcon: Icon(Icons.business),
+              ),
+              maxLength: 50,
+            ),
+            SizedBox(height: 8),
+            Text(
+              widget.existingScan != null
+                ? 'Your updated scan will be saved with the new analysis.'
+                : 'You can view and edit this scan later from the home page.',
+              style: TextStyle(color: Colors.grey[600], fontSize: 12),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('Skip'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.pop(context);
+              await _saveScanResult(nameController.text.trim(), result);
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.green,
+              foregroundColor: Colors.white,
+            ),
+            child: Text('Save'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _generateDefaultProjectName() {
+    String buildingType = _formData['building_type'] ?? 'Building';
+    String area = _formData['built_up_area']?.toString() ?? '';
+    String floors = _formData['floors'] ?? '';
+    
+    if (area.isNotEmpty) {
+      return '$buildingType - ${area} sq.ft - $floors';
+    } else {
+      return '$buildingType - $floors';
+    }
+  }
+
+  Future<void> _saveScanResult(String projectName, Map<String, dynamic> result) async {
+    try {
+      if (projectName.isEmpty) {
+        projectName = _generateDefaultProjectName();
+      }
+
+      ScanResult scan;
+      bool isUpdate = widget.existingScan != null;
+
+      if (isUpdate) {
+        // Update existing scan
+        scan = ScanResult(
+          id: widget.existingScan!.id, // Keep the same ID
+          category: widget.category.toLowerCase(),
+          timestamp: widget.existingScan!.timestamp, // Keep original timestamp
+          questionnaireData: Map<String, dynamic>.from(_formData),
+          predictionResult: result,
+          projectName: projectName,
+        );
+        await ScanStorage.updateScan(scan);
+      } else {
+        // Create new scan
+        scan = ScanResult(
+          id: DateTime.now().millisecondsSinceEpoch.toString(),
+          category: widget.category.toLowerCase(),
+          timestamp: DateTime.now(),
+          questionnaireData: Map<String, dynamic>.from(_formData),
+          predictionResult: result,
+          projectName: projectName,
+        );
+        await ScanStorage.saveScan(scan);
+      }
+
+      // Show success message
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                Icon(Icons.check_circle, color: Colors.white),
+                SizedBox(width: 8),
+                Text(isUpdate ? 'Scan updated successfully!' : 'Scan saved successfully!'),
+              ],
+            ),
+            backgroundColor: Colors.green,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } catch (e) {
+      print('❌ Error saving scan: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                Icon(Icons.error, color: Colors.white),
+                SizedBox(width: 8),
+                Text('Failed to save scan'),
+              ],
+            ),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
   }
 
   Widget _buildResultItem(String label, String value, IconData icon) {
@@ -721,7 +896,10 @@ class _PredictionPageState extends State<PredictionPage> {
     
     return Scaffold(
       appBar: AppBar(
-        title: Text('${widget.category.isNotEmpty ? widget.category[0].toUpperCase() + widget.category.substring(1) : "Building"} Questionnaire'),
+        title: Text(widget.existingScan != null 
+          ? 'Edit ${widget.category.isNotEmpty ? widget.category[0].toUpperCase() + widget.category.substring(1) : "Building"} Project'
+          : '${widget.category.isNotEmpty ? widget.category[0].toUpperCase() + widget.category.substring(1) : "Building"} Questionnaire'
+        ),
         backgroundColor: Colors.white,
         foregroundColor: Colors.black,
         elevation: 0,

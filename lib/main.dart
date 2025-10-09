@@ -320,6 +320,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     HapticFeedback.lightImpact();
     // Call the callback to enable bottom navigation
     widget.onCategorySelected?.call('residential');
+    
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (context) => const NavigationWrapper(
@@ -338,6 +339,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     HapticFeedback.lightImpact();
     // Call the callback to enable bottom navigation
     widget.onCategorySelected?.call('commercial');
+    
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (context) => const NavigationWrapper(
@@ -359,8 +361,6 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0,
-        // FIX: Removed the redundant profile/login button. Navigation is now
-        // handled exclusively by the main BottomNavBar for a cleaner user experience.
         title: Text(
           'Building Platform',
           style: TextStyle(
@@ -368,157 +368,162 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
         ),
         centerTitle: true,
       ),
-      body: SafeArea(
-        child: Column(
-          children: [
-            // Residential Section (Top Half)
-            Expanded(
-              child: MouseRegion(
-                onEnter: (_) {
-                  _residentialController.forward();
-                  _commercialController.reverse();
-                },
-                onExit: (_) {
-                  _residentialController.reverse();
-                },
-                child: GestureDetector(
-                  onTap: _navigateToResidential,
-                  child: AnimatedBuilder(
-                    animation: _residentialScale,
-                    builder: (context, child) {
-                      return Transform.scale(
-                        scale: _residentialScale.value,
+      body: Column(
+        children: [
+          // Residential Section (Top Half)
+          Expanded(
+            child: MouseRegion(
+              onEnter: (_) {
+                _residentialController.forward();
+                _commercialController.reverse();
+              },
+              onExit: (_) {
+                _residentialController.reverse();
+              },
+              child: GestureDetector(
+                onTap: _navigateToResidential,
+                child: AnimatedBuilder(
+                  animation: _residentialScale,
+                  builder: (context, child) {
+                    return Transform.scale(
+                      scale: _residentialScale.value,
+                      child: Container(
+                        margin: EdgeInsets.all(8),
+                        decoration: const BoxDecoration(
+                          borderRadius: BorderRadius.all(Radius.circular(12)),
+                          image: DecorationImage(
+                            image: NetworkImage(
+                                'https://images.unsplash.com/photo-1564013799919-ab600027ffc6?ixlib=rb-4.0.3&auto=format&fit=crop&w=1000&q=80'),
+                            fit: BoxFit.cover,
+                          ),
+                        ),
                         child: Container(
-                          decoration: const BoxDecoration(
-                            image: DecorationImage(
-                              image: NetworkImage(
-                                  'https://images.unsplash.com/photo-1564013799919-ab600027ffc6?ixlib=rb-4.0.3&auto=format&fit=crop&w=1000&q=80'),
-                              fit: BoxFit.cover,
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.all(Radius.circular(12)),
+                            gradient: LinearGradient(
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                              colors: [
+                                Colors.black.withOpacity(0.3),
+                                Colors.black.withOpacity(0.1),
+                              ],
                             ),
                           ),
-                          child: Container(
-                            decoration: BoxDecoration(
-                              gradient: LinearGradient(
-                                begin: Alignment.topLeft,
-                                end: Alignment.bottomRight,
-                                colors: [
-                                  Colors.black.withOpacity(0.4),
-                                  Colors.black.withOpacity(0.1),
-                                ],
-                              ),
-                            ),
-                            child: Padding(
-                              padding: const EdgeInsets.all(24),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                mainAxisAlignment: MainAxisAlignment.end,
-                                children: [
-                                  Text(
-                                    'For Home Builders',
-                                    style: Theme.of(context)
-                                        .textTheme
-                                        .headlineSmall
-                                        ?.copyWith(
-                                          color: Colors.white,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                  ),
-                                  const SizedBox(height: 8),
-                                  Text(
-                                    'Perfect solutions for residential projects and homeowners.',
-                                    style: Theme.of(context)
-                                        .textTheme
-                                        .bodyMedium
-                                        ?.copyWith(
-                                          color: Colors.white.withOpacity(0.9),
-                                        ),
-                                  ),
-                                ],
-                              ),
+                          child: Padding(
+                            padding: const EdgeInsets.all(24),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisAlignment: MainAxisAlignment.end,
+                              children: [
+                                Text(
+                                  'For Residential',
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .headlineSmall
+                                      ?.copyWith(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  'Perfect solutions for your dream home.',
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .bodyMedium
+                                      ?.copyWith(
+                                        color: Colors.white.withOpacity(0.9),
+                                      ),
+                                ),
+                              ],
                             ),
                           ),
                         ),
-                      );
-                    },
-                  ),
+                      ),
+                    );
+                  },
                 ),
               ),
             ),
-            // Commercial Section (Bottom Half)
-            Expanded(
-              child: MouseRegion(
-                onEnter: (_) {
-                  _commercialController.forward();
-                  _residentialController.reverse();
-                },
-                onExit: (_) {
-                  _commercialController.reverse();
-                },
-                child: GestureDetector(
-                  onTap: _navigateToCommercial,
-                  child: AnimatedBuilder(
-                    animation: _commercialScale,
-                    builder: (context, child) {
-                      return Transform.scale(
-                        scale: _commercialScale.value,
+          ),
+          
+          // Commercial Section (Bottom Half)
+          Expanded(
+            child: MouseRegion(
+              onEnter: (_) {
+                _commercialController.forward();
+                _residentialController.reverse();
+              },
+              onExit: (_) {
+                _commercialController.reverse();
+              },
+              child: GestureDetector(
+                onTap: _navigateToCommercial,
+                child: AnimatedBuilder(
+                  animation: _commercialScale,
+                  builder: (context, child) {
+                    return Transform.scale(
+                      scale: _commercialScale.value,
+                      child: Container(
+                        margin: EdgeInsets.all(8),
+                        decoration: const BoxDecoration(
+                          borderRadius: BorderRadius.all(Radius.circular(12)),
+                          image: DecorationImage(
+                            image: NetworkImage(
+                                'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?ixlib=rb-4.0.3&auto=format&fit=crop&w=1000&q=80'),
+                            fit: BoxFit.cover,
+                          ),
+                        ),
                         child: Container(
-                          decoration: const BoxDecoration(
-                            image: DecorationImage(
-                              image: NetworkImage(
-                                  'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?ixlib=rb-4.0.3&auto=format&fit=crop&w=1000&q=80'),
-                              fit: BoxFit.cover,
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.all(Radius.circular(12)),
+                            gradient: LinearGradient(
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                              colors: [
+                                Colors.black.withOpacity(0.4),
+                                Colors.black.withOpacity(0.1),
+                              ],
                             ),
                           ),
-                          child: Container(
-                            decoration: BoxDecoration(
-                              gradient: LinearGradient(
-                                begin: Alignment.topLeft,
-                                end: Alignment.bottomRight,
-                                colors: [
-                                  Colors.black.withOpacity(0.4),
-                                  Colors.black.withOpacity(0.1),
-                                ],
-                              ),
-                            ),
-                            child: Padding(
-                              padding: const EdgeInsets.all(24),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                mainAxisAlignment: MainAxisAlignment.end,
-                                children: [
-                                  Text(
-                                    'For Commercial',
-                                    style: Theme.of(context)
-                                        .textTheme
-                                        .headlineSmall
-                                        ?.copyWith(
-                                          color: Colors.white,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                  ),
-                                  const SizedBox(height: 8),
-                                  Text(
-                                    'Comprehensive solutions for commercial and corporate projects.',
-                                    style: Theme.of(context)
-                                        .textTheme
-                                        .bodyMedium
-                                        ?.copyWith(
-                                          color: Colors.white.withOpacity(0.9),
-                                        ),
-                                  ),
-                                ],
-                              ),
+                          child: Padding(
+                            padding: const EdgeInsets.all(24),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisAlignment: MainAxisAlignment.end,
+                              children: [
+                                Text(
+                                  'For Commercial',
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .headlineSmall
+                                      ?.copyWith(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  'Comprehensive solutions for commercial and corporate projects.',
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .bodyMedium
+                                      ?.copyWith(
+                                        color: Colors.white.withOpacity(0.9),
+                                      ),
+                                ),
+                              ],
                             ),
                           ),
                         ),
-                      );
-                    },
-                  ),
+                      ),
+                    );
+                  },
                 ),
               ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
