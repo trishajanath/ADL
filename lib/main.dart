@@ -13,6 +13,7 @@ import './auth_service.dart';
 import './user_profile_page.dart';
 import 'prediction_page.dart';
 import 'shop_search_page.dart';
+import 'projects_page.dart';
 
 void main() {
   runApp(const MyApp());
@@ -75,6 +76,7 @@ class _MainScreenState extends State<MainScreen> {
     HomePage(onCategorySelected: _onCategorySelected),
     const SearchPage(),
     const QuestionnairePage(),
+    const ProjectsPage(),
     const FavoritesPage(),
     const ProfilePage(), // The router page for login/profile
   ];
@@ -122,8 +124,9 @@ class _MainScreenState extends State<MainScreen> {
                 _buildNavItem(Icons.home, 'Home', 0),
                 _buildNavItem(Icons.search, 'Search', 1),
                 _buildNavItem(Icons.help_outline, 'Questionnaire', 2),
-                _buildNavItem(Icons.favorite_border, 'Favorites', 3),
-                _buildNavItem(Icons.person, 'Profile', 4),
+                _buildNavItem(Icons.construction, 'Projects', 3),
+                _buildNavItem(Icons.favorite_border, 'Favorites', 4),
+                _buildNavItem(Icons.person, 'Profile', 5),
               ],
             ),
           ),
@@ -199,9 +202,12 @@ class _NavigationWrapperState extends State<NavigationWrapper> {
             destinationPage = const QuestionnairePage();
             break;
           case 3:
-            destinationPage = const FavoritesPage();
+            destinationPage = const ProjectsPage();
             break;
           case 4:
+            destinationPage = const FavoritesPage();
+            break;
+          case 5:
             destinationPage = const ProfilePage();
             break;
           default:
@@ -268,8 +274,9 @@ class _NavigationWrapperState extends State<NavigationWrapper> {
                 _buildNavItem(Icons.home, 'Home', 0),
                 _buildNavItem(Icons.search, 'Search', 1),
                 _buildNavItem(Icons.help_outline, 'Questionnaire', 2),
-                _buildNavItem(Icons.favorite_border, 'Favorites', 3),
-                _buildNavItem(Icons.person, 'Profile', 4),
+                _buildNavItem(Icons.construction, 'Projects', 3),
+                _buildNavItem(Icons.favorite_border, 'Favorites', 4),
+                _buildNavItem(Icons.person, 'Profile', 5),
               ],
             ),
           ),

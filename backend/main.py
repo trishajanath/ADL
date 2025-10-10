@@ -136,6 +136,25 @@ class PriceReport(BaseModel):
     product_name: str
     price: float
 
+# Project management models
+class ProjectCreate(BaseModel):
+    name: str
+    location: str
+    project_type: str  # "Residential" or "Commercial"
+    budget: Optional[float] = 0.0
+    description: Optional[str] = ""
+
+class Project(BaseModel):
+    id: int
+    name: str
+    location: str
+    project_type: str
+    budget: float
+    created_at: str
+    user_id: str
+    description: str
+    status: str
+
 # Database initialization
 def init_db():
     """Initialize the SQLite database for storing community-reported prices"""
@@ -167,6 +186,21 @@ def init_db():
             price REAL NOT NULL,
             reported_at TEXT NOT NULL,
             user_id TEXT DEFAULT 'anonymous'
+        )
+    ''')
+    
+    # Create projects table (for construction project management)
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS projects (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            location TEXT NOT NULL,
+            project_type TEXT NOT NULL CHECK (project_type IN ('Residential', 'Commercial')),
+            budget REAL DEFAULT 0.0,
+            created_at TEXT NOT NULL,
+            user_id TEXT DEFAULT 'anonymous',
+            description TEXT DEFAULT '',
+            status TEXT DEFAULT 'Planning' CHECK (status IN ('Planning', 'In Progress', 'Completed', 'On Hold'))
         )
     ''')
     
@@ -659,6 +693,153 @@ async def get_store_details(place_id: str):
     except Exception as e:
         print(f"❌ Error getting store details: {e}")
         return {"details": None, "error": str(e)}
+
+# ====================================
+# PROJECTS API ENDPOINTS
+# ====================================
+
+@app.post("/api/v1/projects")
+async def create_project(project: ProjectCreate):
+    """
+    Create a new construction project
+    """
+    try:
+        # Validate project type
+        if project.project_type not in ["Residential", "Commercial"]:
+            raise HTTPException(status_code=400, detail="Project type must be 'Residential' or 'Commercial'")
+        
+        # Connect to database
+        conn = sqlite3.connect('store_prices.db')
+        cursor = conn.cursor()
+        
+        # Insert new project
+        created_at = datetime.now().isoformat()
+        cursor.execute('''
+            INSERT INTO projects (name, location, project_type, budget, created_at, description, status)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        ''', (
+            project.name,
+            project.location,
+            project.project_type,
+            project.budget,
+            created_at,
+            project.description,
+            'Planning'
+        ))
+        
+        project_id = cursor.lastrowid
+        conn.commit()
+        conn.close()
+        
+        print(f"✅ Created new project: {project.name} (ID: {project_id})")
+        
+        return {
+            "success": True,
+            "message": "Project created successfully",
+            "project_id": project_id,
+            "project": {
+                "id": project_id,
+                "name": project.name,
+                "location": project.location,
+                "project_type": project.project_type,
+                "budget": project.budget,
+                "created_at": created_at,
+                "description": project.description,
+                "status": "Planning"
+            }
+        }
+        
+    except Exception as e:
+        print(f"❌ Error creating project: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to create project: {str(e)}")
+
+@app.get("/api/v1/projects")
+async def get_projects(user_id: str = "anonymous"):
+    """
+    Get all projects for a user
+    """
+    try:
+        conn = sqlite3.connect('store_prices.db')
+        cursor = conn.cursor()
+        
+        # Get all projects (for now, we'll get all projects regardless of user)
+        cursor.execute('''
+            SELECT id, name, location, project_type, budget, created_at, user_id, description, status
+            FROM projects
+            ORDER BY created_at DESC
+        ''')
+        
+        projects = []
+        for row in cursor.fetchall():
+            projects.append({
+                "id": row[0],
+                "name": row[1],
+                "location": row[2],
+                "project_type": row[3],
+                "budget": row[4],
+                "created_at": row[5],
+                "user_id": row[6],
+                "description": row[7],
+                "status": row[8]
+            })
+        
+        conn.close()
+        
+        print(f"✅ Retrieved {len(projects)} projects")
+        return {
+            "success": True,
+            "projects": projects,
+            "count": len(projects)
+        }
+        
+    except Exception as e:
+        print(f"❌ Error getting projects: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to get projects: {str(e)}")
+
+@app.get("/api/v1/projects/{project_id}")
+async def get_project(project_id: int):
+    """
+    Get a specific project by ID
+    """
+    try:
+        conn = sqlite3.connect('store_prices.db')
+        cursor = conn.cursor()
+        
+        cursor.execute('''
+            SELECT id, name, location, project_type, budget, created_at, user_id, description, status
+            FROM projects
+            WHERE id = ?
+        ''', (project_id,))
+        
+        row = cursor.fetchone()
+        conn.close()
+        
+        if not row:
+            raise HTTPException(status_code=404, detail="Project not found")
+        
+        project = {
+            "id": row[0],
+            "name": row[1],
+            "location": row[2],
+            "project_type": row[3],
+            "budget": row[4],
+            "created_at": row[5],
+            "user_id": row[6],
+            "description": row[7],
+            "status": row[8]
+        }
+        
+        print(f"✅ Retrieved project: {project['name']}")
+        return {
+            "success": True,
+            "project": project
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ Error getting project: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to get project: {str(e)}")
 
 @app.get("/api/v1/store-photo/{photo_reference}")
 async def get_store_photo(photo_reference: str, maxwidth: int = 400):
