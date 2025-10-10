@@ -34,6 +34,56 @@ GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "137371359979-uteh19od42d7hjal2
 # Google Maps API configuration
 GOOGLE_MAPS_API_KEY = os.getenv("GOOGLE_MAPS_API_KEY", "AIzaSyCzWcYKBQGWFY7uqSp15BN8OKNsaqVJlYY")
 
+# Product Category Mapping - Maps Google Places types to expected product categories
+PRODUCT_CATEGORY_MAP = {
+    "hardware_store": [
+        "Tools", "Plumbing Supplies", "Electrical Fittings", "Fasteners", 
+        "Hardware", "Safety Equipment", "Power Tools", "Hand Tools", "Locks & Keys"
+    ],
+    "home_improvement_store": [
+        "Building Materials", "Tools", "Hardware", "Paint & Supplies", 
+        "Lumber", "Flooring", "Roofing Materials", "Insulation", "Windows & Doors"
+    ],
+    "building_materials_store": [
+        "Cement", "Steel", "Bricks", "Sand", "Gravel", "Concrete Blocks", 
+        "Rebar", "Construction Chemicals", "Waterproofing Materials", "Tiles"
+    ],
+    "paint_store": [
+        "Paint", "Brushes & Rollers", "Primers", "Stains", "Varnishes", 
+        "Spray Paint", "Color Mixing", "Painting Accessories", "Wall Textures"
+    ],
+    "home_goods_store": [
+        "Home Decor", "Storage Solutions", "Cleaning Supplies", "Organization", 
+        "Small Appliances", "Household Items", "Garden Supplies"
+    ],
+    "plumbing_supply_store": [
+        "Pipes", "Fittings", "Valves", "Pumps", "Water Heaters", "Fixtures", 
+        "Plumbing Tools", "Drainage Solutions", "Water Treatment"
+    ],
+    "electrical_supply_store": [
+        "Wires & Cables", "Circuit Breakers", "Outlets & Switches", "Lighting", 
+        "Electrical Tools", "Conduits", "Transformers", "Solar Equipment"
+    ],
+    "roofing_contractor": [
+        "Roofing Materials", "Shingles", "Metal Roofing", "Gutters", 
+        "Roof Insulation", "Flashing", "Roof Repair Materials"
+    ],
+    "lumber_yard": [
+        "Lumber", "Plywood", "Engineered Wood", "Treated Lumber", 
+        "Millwork", "Decking Materials", "Beams & Posts"
+    ],
+    "tile_contractor": [
+        "Tiles", "Grout", "Adhesives", "Tile Tools", "Sealers", 
+        "Mosaic", "Natural Stone", "Installation Materials"
+    ],
+    "store": [
+        "General Supplies", "Basic Hardware", "Household Items"
+    ],
+    "establishment": [
+        "Various Products", "Mixed Inventory"
+    ]
+}
+
 # Load ML model components on startup
 print("🔧 Loading ML model components...")
 try:
@@ -345,6 +395,17 @@ async def find_nearby_stores(search_input: NearbySearchInput):
             if place.get('photos'):
                 store_data["photo_reference"] = place['photos'][0].get('photo_reference')
                 store_data["photos"] = [photo.get('photo_reference') for photo in place.get('photos', [])[:3]]
+            
+            # Infer product categories based on store types
+            place_types = place.get('types', [])
+            inferred_categories = set()
+            
+            for place_type in place_types:
+                if place_type in PRODUCT_CATEGORY_MAP:
+                    inferred_categories.update(PRODUCT_CATEGORY_MAP[place_type])
+            
+            # Convert set to list and add to store data
+            store_data["inferred_product_categories"] = list(inferred_categories)
             
             stores.append(store_data)
         

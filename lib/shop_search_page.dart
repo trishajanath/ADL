@@ -639,6 +639,33 @@ class _ShopSearchPageState extends State<ShopSearchPage> {
                                               fontStyle: FontStyle.italic,
                                             ),
                                           ),
+                                          // Product Categories Section
+                                          if (store.inferredProductCategories.isNotEmpty) ...[
+                                            const SizedBox(height: 6),
+                                            Wrap(
+                                              spacing: 4,
+                                              runSpacing: 2,
+                                              children: store.inferredProductCategories.map((category) {
+                                                return Chip(
+                                                  label: Text(
+                                                    category,
+                                                    style: const TextStyle(
+                                                      fontSize: 10,
+                                                      fontWeight: FontWeight.w500,
+                                                    ),
+                                                  ),
+                                                  backgroundColor: Colors.orange.shade50,
+                                                  side: BorderSide(
+                                                    color: Colors.orange.shade200,
+                                                    width: 0.5,
+                                                  ),
+                                                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 0),
+                                                  visualDensity: VisualDensity.compact,
+                                                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                                );
+                                              }).toList(),
+                                            ),
+                                          ],
                                         ],
                                       ),
                                       trailing: Row(

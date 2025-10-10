@@ -22,6 +22,7 @@ class ConstructionStore {
   final String? formattedAddress;
   final List<Map<String, dynamic>>? reviews;
   final List<String>? photos;
+  final List<String> inferredProductCategories;
 
   ConstructionStore({
     required this.placeId,
@@ -42,6 +43,7 @@ class ConstructionStore {
     this.formattedAddress,
     this.reviews,
     this.photos,
+    required this.inferredProductCategories,
   });
 
   factory ConstructionStore.fromJson(Map<String, dynamic> json, double userLat, double userLng) {
@@ -70,6 +72,7 @@ class ConstructionStore {
       userRatingsTotal: json['user_ratings_total'],
       types: json['types']?.cast<String>(),
       formattedAddress: json['formatted_address'],
+      inferredProductCategories: (json['inferred_product_categories'] as List<dynamic>?)?.cast<String>() ?? [],
     );
   }
 }
@@ -119,6 +122,7 @@ class GooglePlacesService {
           );
           
           print('🏪 Store: ${store['name']} at ${store['latitude']}, ${store['longitude']} - Distance: ${(distance/1000).toStringAsFixed(1)}km');
+          print('🏷️ Categories: ${store['inferred_product_categories']}');
           
           return ConstructionStore(
             placeId: store['place_id'] ?? '',
@@ -139,6 +143,7 @@ class GooglePlacesService {
             photoReference: store['photo_reference'],
             photos: store['photos']?.cast<String>(),
             reviews: store['reviews']?.cast<Map<String, dynamic>>(),
+            inferredProductCategories: (store['inferred_product_categories'] as List<dynamic>?)?.cast<String>() ?? [],
           );
         }).toList();
 
