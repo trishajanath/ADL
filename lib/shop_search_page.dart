@@ -6,6 +6,7 @@ import 'package:http/http.dart' as http;
 import 'dart:convert' as convert;
 import 'location_service.dart';
 import 'google_places_service.dart';
+import 'enhanced_store_details_page.dart';
 
 class ShopSearchPage extends StatefulWidget {
   const ShopSearchPage({super.key});
@@ -21,6 +22,7 @@ class _ShopSearchPageState extends State<ShopSearchPage> {
   bool _isLoading = false;
   Position? _currentPosition;
   String _statusMessage = ''; // User-facing status message
+  String _sortBy = 'distance'; // 'distance' or 'rating'
 
   @override
   void initState() {
@@ -192,6 +194,8 @@ class _ShopSearchPageState extends State<ShopSearchPage> {
 
       setState(() {
         _stores = stores;
+        // Apply current sort preference
+        _sortStores(_sortBy);
         _isLoading = false;
         if (stores.isEmpty) {
           _statusMessage = "No '$query' stores found in your area.\n\nTry a different search term or location.";
@@ -305,6 +309,31 @@ class _ShopSearchPageState extends State<ShopSearchPage> {
     } else {
       return '${(distanceInMeters / 1000).toStringAsFixed(1)}km';
     }
+  }
+
+  // --- Sorting ---
+  void _sortStores(String sortBy) {
+    _sortBy = sortBy;
+    if (sortBy == 'distance') {
+      _stores.sort((a, b) => a.distance.compareTo(b.distance));
+    } else if (sortBy == 'rating') {
+      _stores.sort((a, b) => b.rating.compareTo(a.rating)); // Higher rating first
+    }
+  }
+  
+  void _applySortAndRefresh(String sortBy) {
+    setState(() {
+      _sortStores(sortBy);
+    });
+  }
+
+  // --- Navigation ---
+  void _showStoreDetails(ConstructionStore store) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => EnhancedStoreDetailsPage(store: store),
+      ),
+    );
   }
 
   // --- UI ---
@@ -481,14 +510,91 @@ class _ShopSearchPageState extends State<ShopSearchPage> {
                                   ],
                                 ),
                               )
-                            : ListView.builder(
-                                itemCount: _stores.length,
-                                padding: const EdgeInsets.all(16),
-                                itemBuilder: (context, index) {
+                            : Column(
+                                children: [
+                                  // Sort header
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                    decoration: BoxDecoration(
+                                      color: Colors.grey[100],
+                                      border: Border(bottom: BorderSide(color: Colors.grey[300]!)),
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        Text(
+                                          'Found ${_stores.length} stores',
+                                          style: const TextStyle(
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                        if (_sortBy == 'distance') 
+                                          const Text(
+                                            ' • Sorted by distance',
+                                            style: TextStyle(
+                                              fontSize: 12,
+                                              color: Colors.blue,
+                                              fontStyle: FontStyle.italic,
+                                            ),
+                                          ),
+                                        if (_sortBy == 'rating') 
+                                          const Text(
+                                            ' • Sorted by rating',
+                                            style: TextStyle(
+                                              fontSize: 12,
+                                              color: Colors.amber,
+                                              fontStyle: FontStyle.italic,
+                                            ),
+                                          ),
+                                        const Spacer(),
+                                        const Text('Sort by: ', style: TextStyle(fontSize: 14)),
+                                        DropdownButton<String>(
+                                          value: _sortBy,
+                                          underline: Container(),
+                                          items: const [
+                                            DropdownMenuItem(
+                                              value: 'distance',
+                                              child: Row(
+                                                mainAxisSize: MainAxisSize.min,
+                                                children: [
+                                                  Icon(Icons.location_on, size: 16, color: Colors.blue),
+                                                  SizedBox(width: 4),
+                                                  Text('Distance'),
+                                                ],
+                                              ),
+                                            ),
+                                            DropdownMenuItem(
+                                              value: 'rating',
+                                              child: Row(
+                                                mainAxisSize: MainAxisSize.min,
+                                                children: [
+                                                  Icon(Icons.star, size: 16, color: Colors.amber),
+                                                  SizedBox(width: 4),
+                                                  Text('Rating'),
+                                                ],
+                                              ),
+                                            ),
+                                          ],
+                                          onChanged: (value) {
+                                            if (value != null) {
+                                              _applySortAndRefresh(value);
+                                            }
+                                          },
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  // Store list
+                                  Expanded(
+                                    child: ListView.builder(
+                                      itemCount: _stores.length,
+                                      padding: const EdgeInsets.all(16),
+                                      itemBuilder: (context, index) {
                                   final store = _stores[index];
                                   return Card(
                                     margin: const EdgeInsets.only(bottom: 12),
                                     child: ListTile(
+                                      onTap: () => _showStoreDetails(store),
                                       leading: CircleAvatar(
                                         backgroundColor: Colors.orange,
                                         child: Text(
@@ -524,31 +630,45 @@ class _ShopSearchPageState extends State<ShopSearchPage> {
                                               ],
                                             ],
                                           ),
+                                          const SizedBox(height: 4),
+                                          Text(
+                                            'Tap for photos, reviews & details',
+                                            style: TextStyle(
+                                              color: Colors.blue[600],
+                                              fontSize: 12,
+                                              fontStyle: FontStyle.italic,
+                                            ),
+                                          ),
                                         ],
                                       ),
-                                      trailing: PopupMenuButton(
-                                        itemBuilder: (context) => [
-                                          PopupMenuItem(
-                                            child: const ListTile(
-                                              leading: Icon(Icons.directions),
-                                              title: Text('Directions'),
-                                            ),
-                                            onTap: () => _openGoogleMaps(store),
+                                      trailing: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          IconButton(
+                                            icon: const Icon(Icons.directions, color: Colors.blue),
+                                            onPressed: () => _openGoogleMaps(store),
+                                            tooltip: 'Get Directions',
                                           ),
                                           if (store.phoneNumber != null)
-                                            PopupMenuItem(
-                                              child: const ListTile(
-                                                leading: Icon(Icons.phone),
-                                                title: Text('Call'),
-                                              ),
-                                              onTap: () => _callStore(store.phoneNumber),
+                                            IconButton(
+                                              icon: const Icon(Icons.phone, color: Colors.green),
+                                              onPressed: () => _callStore(store.phoneNumber),
+                                              tooltip: 'Call Store',
                                             ),
+                                          IconButton(
+                                            icon: const Icon(Icons.info, color: Colors.orange),
+                                            onPressed: () => _showStoreDetails(store),
+                                            tooltip: 'View Details',
+                                          ),
                                         ],
                                       ),
                                     ),
                                   );
                                 },
                               ),
+                                    ),
+                                  ],
+                                ),
                   ),
                 ],
               ),
