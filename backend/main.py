@@ -9,9 +9,11 @@ import json
 import joblib
 import pandas as pd
 import numpy as np
-from typing import Optional
+from typing import Optional, List
 import googlemaps
 import requests as http_requests
+import sqlite3
+from datetime import datetime
 
 # Load environment variables
 load_dotenv()
@@ -128,6 +130,52 @@ class NearbySearchInput(BaseModel):
 
 class GeocodeInput(BaseModel):
     address: str
+
+# New model for price reporting
+class PriceReport(BaseModel):
+    product_name: str
+    price: float
+
+# Database initialization
+def init_db():
+    """Initialize the SQLite database for storing community-reported prices"""
+    conn = sqlite3.connect('store_prices.db')
+    cursor = conn.cursor()
+    
+    # Create predictions table (for ML model)
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS predictions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            building_type TEXT,
+            floors TEXT,
+            soil_type TEXT,
+            seismic_zone TEXT,
+            exposure TEXT,
+            load_type TEXT,
+            built_up_area INTEGER,
+            predicted_grade TEXT,
+            created_at TEXT
+        )
+    ''')
+    
+    # Create store_prices table (for community price tracker)
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS store_prices (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            place_id TEXT NOT NULL,
+            product_name TEXT NOT NULL,
+            price REAL NOT NULL,
+            reported_at TEXT NOT NULL,
+            user_id TEXT DEFAULT 'anonymous'
+        )
+    ''')
+    
+    conn.commit()
+    conn.close()
+    print("✅ Database initialized successfully!")
+
+# Initialize database on startup
+init_db()
 
 @app.get("/")
 def read_root():
@@ -464,6 +512,49 @@ async def geocode_address(geocode_input: GeocodeInput):
             "error": f"Geocoding service error: {str(e)}"
         }
 
+@app.post("/api/v1/stores/{place_id}/prices")
+async def report_store_price(place_id: str, price_report: PriceReport):
+    """
+    Allow users to report current prices for products at a specific store
+    """
+    try:
+        print(f"💰 Reporting price for {price_report.product_name} at store {place_id}: ₹{price_report.price}")
+        
+        # Connect to database
+        conn = sqlite3.connect('store_prices.db')
+        cursor = conn.cursor()
+        
+        # Insert the new price report
+        cursor.execute('''
+            INSERT INTO store_prices (place_id, product_name, price, reported_at, user_id)
+            VALUES (?, ?, ?, ?, ?)
+        ''', (
+            place_id,
+            price_report.product_name,
+            price_report.price,
+            datetime.now().isoformat(),
+            'anonymous'  # Placeholder for user system
+        ))
+        
+        conn.commit()
+        conn.close()
+        
+        print(f"✅ Price report saved successfully")
+        return {
+            "success": True,
+            "message": f"Price for {price_report.product_name} reported successfully",
+            "data": {
+                "place_id": place_id,
+                "product_name": price_report.product_name,
+                "price": price_report.price,
+                "reported_at": datetime.now().isoformat()
+            }
+        }
+        
+    except Exception as e:
+        print(f"❌ Error reporting price: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to report price: {str(e)}")
+
 @app.get("/api/v1/store-details/{place_id}")
 async def get_store_details(place_id: str):
     """
@@ -523,6 +614,44 @@ async def get_store_details(place_id: str):
                 photo.get('photo_reference') 
                 for photo in result['photos'][:5]  # Limit to 5 photos
             ]
+        
+        # Get latest community-reported prices for this store
+        try:
+            conn = sqlite3.connect('store_prices.db')
+            cursor = conn.cursor()
+            
+            # Query to get the most recent price for each product at this store
+            cursor.execute('''
+                SELECT product_name, price, reported_at
+                FROM store_prices 
+                WHERE place_id = ? 
+                  AND (product_name, reported_at) IN (
+                      SELECT product_name, MAX(reported_at)
+                      FROM store_prices 
+                      WHERE place_id = ?
+                      GROUP BY product_name
+                  )
+                ORDER BY reported_at DESC
+            ''', (place_id, place_id))
+            
+            price_data = cursor.fetchall()
+            conn.close()
+            
+            # Format price data
+            details["latest_prices"] = [
+                {
+                    "product_name": row[0],
+                    "price": row[1],
+                    "last_reported": row[2]
+                }
+                for row in price_data
+            ]
+            
+            print(f"💰 Found {len(price_data)} price reports for this store")
+            
+        except Exception as price_error:
+            print(f"⚠️ Error fetching prices: {price_error}")
+            details["latest_prices"] = []
         
         print(f"✅ Retrieved detailed information for {details['name']}")
         return {"details": details, "status": "success"}

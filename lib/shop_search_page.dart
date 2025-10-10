@@ -521,33 +521,42 @@ class _ShopSearchPageState extends State<ShopSearchPage> {
                                     ),
                                     child: Row(
                                       children: [
-                                        Text(
-                                          'Found ${_stores.length} stores',
-                                          style: const TextStyle(
-                                            fontSize: 16,
-                                            fontWeight: FontWeight.bold,
+                                        Flexible(
+                                          child: Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                'Found ${_stores.length} stores',
+                                                style: const TextStyle(
+                                                  fontSize: 16,
+                                                  fontWeight: FontWeight.bold,
+                                                ),
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                              if (_sortBy == 'distance') 
+                                                const Text(
+                                                  'Sorted by distance',
+                                                  style: TextStyle(
+                                                    fontSize: 12,
+                                                    color: Colors.blue,
+                                                    fontStyle: FontStyle.italic,
+                                                  ),
+                                                ),
+                                              if (_sortBy == 'rating') 
+                                                const Text(
+                                                  'Sorted by rating',
+                                                  style: TextStyle(
+                                                    fontSize: 12,
+                                                    color: Colors.amber,
+                                                    fontStyle: FontStyle.italic,
+                                                  ),
+                                                ),
+                                            ],
                                           ),
                                         ),
-                                        if (_sortBy == 'distance') 
-                                          const Text(
-                                            ' • Sorted by distance',
-                                            style: TextStyle(
-                                              fontSize: 12,
-                                              color: Colors.blue,
-                                              fontStyle: FontStyle.italic,
-                                            ),
-                                          ),
-                                        if (_sortBy == 'rating') 
-                                          const Text(
-                                            ' • Sorted by rating',
-                                            style: TextStyle(
-                                              fontSize: 12,
-                                              color: Colors.amber,
-                                              fontStyle: FontStyle.italic,
-                                            ),
-                                          ),
-                                        const Spacer(),
-                                        const Text('Sort by: ', style: TextStyle(fontSize: 14)),
+                                        const SizedBox(width: 8),
+                                        const Text('Sort: ', style: TextStyle(fontSize: 14)),
                                         DropdownButton<String>(
                                           value: _sortBy,
                                           underline: Container(),
@@ -593,101 +602,201 @@ class _ShopSearchPageState extends State<ShopSearchPage> {
                                   final store = _stores[index];
                                   return Card(
                                     margin: const EdgeInsets.only(bottom: 12),
-                                    child: ListTile(
+                                    elevation: 2,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    child: InkWell(
+                                      borderRadius: BorderRadius.circular(12),
                                       onTap: () => _showStoreDetails(store),
-                                      leading: CircleAvatar(
-                                        backgroundColor: Colors.orange,
-                                        child: Text(
-                                          store.name[0],
-                                          style: const TextStyle(color: Colors.white),
-                                        ),
-                                      ),
-                                      title: Text(store.name),
-                                      subtitle: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          Text(store.address),
-                                          const SizedBox(height: 4),
-                                          Row(
-                                            children: [
-                                              Icon(Icons.star, size: 16, color: Colors.amber),
-                                              Text(' ${store.rating}'),
-                                              const SizedBox(width: 16),
-                                              Icon(Icons.location_on, size: 16, color: Colors.grey),
-                                              Text(' ${_formatDistance(store.distance)}'),
-                                              if (store.isOpen) ...[
-                                                const SizedBox(width: 16),
-                                                Container(
-                                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                                  decoration: BoxDecoration(
-                                                    color: Colors.green,
-                                                    borderRadius: BorderRadius.circular(4),
+                                      child: Padding(
+                                        padding: const EdgeInsets.all(16),
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            // Store Header
+                                            Row(
+                                              children: [
+                                                CircleAvatar(
+                                                  backgroundColor: Colors.orange,
+                                                  radius: 20,
+                                                  child: Text(
+                                                    store.name[0],
+                                                    style: const TextStyle(
+                                                      color: Colors.white,
+                                                      fontWeight: FontWeight.bold,
+                                                    ),
                                                   ),
-                                                  child: const Text('Open', 
-                                                    style: TextStyle(color: Colors.white, fontSize: 10),
+                                                ),
+                                                const SizedBox(width: 12),
+                                                Expanded(
+                                                  child: Column(
+                                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                                    children: [
+                                                      Text(
+                                                        store.name,
+                                                        style: const TextStyle(
+                                                          fontSize: 16,
+                                                          fontWeight: FontWeight.bold,
+                                                        ),
+                                                        maxLines: 1,
+                                                        overflow: TextOverflow.ellipsis,
+                                                      ),
+                                                      const SizedBox(height: 4),
+                                                      Text(
+                                                        store.address,
+                                                        style: TextStyle(
+                                                          fontSize: 12,
+                                                          color: Colors.grey[600],
+                                                        ),
+                                                        maxLines: 2,
+                                                        overflow: TextOverflow.ellipsis,
+                                                      ),
+                                                    ],
+                                                  ),
+                                                ),
+                                                if (store.isOpen)
+                                                  Container(
+                                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                                    decoration: BoxDecoration(
+                                                      color: Colors.green,
+                                                      borderRadius: BorderRadius.circular(6),
+                                                    ),
+                                                    child: const Text(
+                                                      'OPEN',
+                                                      style: TextStyle(
+                                                        color: Colors.white,
+                                                        fontSize: 10,
+                                                        fontWeight: FontWeight.bold,
+                                                      ),
+                                                    ),
+                                                  ),
+                                              ],
+                                            ),
+                                            
+                                            const SizedBox(height: 12),
+                                            
+                                            // Rating and Distance Row
+                                            Row(
+                                              children: [
+                                                Icon(Icons.star, size: 16, color: Colors.amber),
+                                                const SizedBox(width: 4),
+                                                Text(
+                                                  '${store.rating}',
+                                                  style: const TextStyle(
+                                                    fontSize: 14,
+                                                    fontWeight: FontWeight.w600,
+                                                  ),
+                                                ),
+                                                const SizedBox(width: 16),
+                                                Icon(Icons.location_on, size: 16, color: Colors.blue),
+                                                const SizedBox(width: 4),
+                                                Text(
+                                                  _formatDistance(store.distance),
+                                                  style: const TextStyle(
+                                                    fontSize: 14,
+                                                    color: Colors.blue,
+                                                    fontWeight: FontWeight.w600,
+                                                  ),
+                                                ),
+                                                const Spacer(),
+                                                Text(
+                                                  'Tap for details',
+                                                  style: TextStyle(
+                                                    color: Colors.blue[600],
+                                                    fontSize: 12,
+                                                    fontStyle: FontStyle.italic,
                                                   ),
                                                 ),
                                               ],
-                                            ],
-                                          ),
-                                          const SizedBox(height: 4),
-                                          Text(
-                                            'Tap for photos, reviews & details',
-                                            style: TextStyle(
-                                              color: Colors.blue[600],
-                                              fontSize: 12,
-                                              fontStyle: FontStyle.italic,
                                             ),
-                                          ),
-                                          // Product Categories Section
-                                          if (store.inferredProductCategories.isNotEmpty) ...[
-                                            const SizedBox(height: 6),
-                                            Wrap(
-                                              spacing: 4,
-                                              runSpacing: 2,
-                                              children: store.inferredProductCategories.map((category) {
-                                                return Chip(
-                                                  label: Text(
-                                                    category,
-                                                    style: const TextStyle(
-                                                      fontSize: 10,
-                                                      fontWeight: FontWeight.w500,
+                                            
+                                            // Product Categories - Horizontal Scrollable
+                                            if (store.inferredProductCategories.isNotEmpty) ...[
+                                              const SizedBox(height: 12),
+                                              SizedBox(
+                                                height: 32,
+                                                child: ListView.builder(
+                                                  scrollDirection: Axis.horizontal,
+                                                  itemCount: store.inferredProductCategories.length,
+                                                  itemBuilder: (context, categoryIndex) {
+                                                    final category = store.inferredProductCategories[categoryIndex];
+                                                    return Container(
+                                                      margin: EdgeInsets.only(
+                                                        right: categoryIndex < store.inferredProductCategories.length - 1 ? 8 : 0,
+                                                      ),
+                                                      child: Chip(
+                                                        label: Text(
+                                                          category,
+                                                          style: const TextStyle(
+                                                            fontSize: 11,
+                                                            fontWeight: FontWeight.w500,
+                                                          ),
+                                                        ),
+                                                        backgroundColor: Colors.orange.shade50,
+                                                        side: BorderSide(
+                                                          color: Colors.orange.shade200,
+                                                          width: 0.5,
+                                                        ),
+                                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
+                                                        visualDensity: VisualDensity.compact,
+                                                        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                                      ),
+                                                    );
+                                                  },
+                                                ),
+                                              ),
+                                            ],
+                                            
+                                            const SizedBox(height: 12),
+                                            
+                                            // Action Buttons Row
+                                            Row(
+                                              children: [
+                                                Expanded(
+                                                  child: OutlinedButton.icon(
+                                                    onPressed: () => _openGoogleMaps(store),
+                                                    icon: const Icon(Icons.directions, size: 16),
+                                                    label: const Text('Directions'),
+                                                    style: OutlinedButton.styleFrom(
+                                                      foregroundColor: Colors.blue,
+                                                      side: const BorderSide(color: Colors.blue),
+                                                      padding: const EdgeInsets.symmetric(vertical: 8),
                                                     ),
                                                   ),
-                                                  backgroundColor: Colors.orange.shade50,
-                                                  side: BorderSide(
-                                                    color: Colors.orange.shade200,
-                                                    width: 0.5,
+                                                ),
+                                                if (store.phoneNumber != null) ...[
+                                                  const SizedBox(width: 8),
+                                                  Expanded(
+                                                    child: OutlinedButton.icon(
+                                                      onPressed: () => _callStore(store.phoneNumber),
+                                                      icon: const Icon(Icons.phone, size: 16),
+                                                      label: const Text('Call'),
+                                                      style: OutlinedButton.styleFrom(
+                                                        foregroundColor: Colors.green,
+                                                        side: const BorderSide(color: Colors.green),
+                                                        padding: const EdgeInsets.symmetric(vertical: 8),
+                                                      ),
+                                                    ),
                                                   ),
-                                                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 0),
-                                                  visualDensity: VisualDensity.compact,
-                                                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                                                );
-                                              }).toList(),
+                                                ],
+                                                const SizedBox(width: 8),
+                                                Expanded(
+                                                  child: ElevatedButton.icon(
+                                                    onPressed: () => _showStoreDetails(store),
+                                                    icon: const Icon(Icons.info, size: 16),
+                                                    label: const Text('Details'),
+                                                    style: ElevatedButton.styleFrom(
+                                                      backgroundColor: Colors.orange,
+                                                      foregroundColor: Colors.white,
+                                                      padding: const EdgeInsets.symmetric(vertical: 8),
+                                                    ),
+                                                  ),
+                                                ),
+                                              ],
                                             ),
                                           ],
-                                        ],
-                                      ),
-                                      trailing: Row(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          IconButton(
-                                            icon: const Icon(Icons.directions, color: Colors.blue),
-                                            onPressed: () => _openGoogleMaps(store),
-                                            tooltip: 'Get Directions',
-                                          ),
-                                          if (store.phoneNumber != null)
-                                            IconButton(
-                                              icon: const Icon(Icons.phone, color: Colors.green),
-                                              onPressed: () => _callStore(store.phoneNumber),
-                                              tooltip: 'Call Store',
-                                            ),
-                                          IconButton(
-                                            icon: const Icon(Icons.info, color: Colors.orange),
-                                            onPressed: () => _showStoreDetails(store),
-                                            tooltip: 'View Details',
-                                          ),
-                                        ],
+                                        ),
                                       ),
                                     ),
                                   );

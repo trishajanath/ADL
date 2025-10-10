@@ -14,7 +14,7 @@ class EnhancedStoreDetailsPage extends StatefulWidget {
 
 class _EnhancedStoreDetailsPageState extends State<EnhancedStoreDetailsPage> {
   bool _isLoadingDetails = false;
-  Map<String, dynamic>? _storeDetails;
+  StoreDetails? _storeDetails;
 
   @override
   void initState() {
@@ -26,14 +26,14 @@ class _EnhancedStoreDetailsPageState extends State<EnhancedStoreDetailsPage> {
     setState(() => _isLoadingDetails = true);
     
     try {
-      final details = await GooglePlacesService.getStoreDetails(widget.store.placeId);
+      final details = await GooglePlacesService.getStoreDetailsComplete(widget.store.placeId);
       setState(() {
         _storeDetails = details;
         _isLoadingDetails = false;
       });
       
       if (details != null) {
-        print('✅ Loaded detailed information for ${details['name']}');
+        print('✅ Loaded detailed information for ${details.name}');
       }
     } catch (e) {
       setState(() => _isLoadingDetails = false);
@@ -61,7 +61,7 @@ class _EnhancedStoreDetailsPageState extends State<EnhancedStoreDetailsPage> {
 
   Future<void> _callStore() async {
     // Use detailed phone number if available, otherwise use basic store data
-    String? phoneNumber = _storeDetails?['phone_number'] ?? widget.store.phoneNumber;
+    String? phoneNumber = _storeDetails?.phoneNumber ?? widget.store.phoneNumber;
     
     if (phoneNumber != null && phoneNumber.isNotEmpty) {
       final url = 'tel:$phoneNumber';
@@ -77,7 +77,7 @@ class _EnhancedStoreDetailsPageState extends State<EnhancedStoreDetailsPage> {
 
   Future<void> _openWebsite() async {
     // Use detailed website if available, otherwise use basic store data
-    String? website = _storeDetails?['website'] ?? widget.store.website;
+    String? website = _storeDetails?.website ?? widget.store.website;
     
     if (website != null && website.isNotEmpty) {
       if (await canLaunchUrl(Uri.parse(website))) {
@@ -102,6 +102,125 @@ class _EnhancedStoreDetailsPageState extends State<EnhancedStoreDetailsPage> {
     } else {
       return '${(distanceInMeters / 1000).toStringAsFixed(1)}km away';
     }
+  }
+
+  // List of common construction materials for price reporting
+  final List<String> _constructionProducts = [
+    'Cement (50kg bag)',
+    'TMT Steel (per kg)',
+    'Bricks (per piece)',
+    'Sand (per m³)',
+    'Gravel (per m³)',
+    'Concrete Blocks (per piece)',
+    'Paint (per liter)',
+    'Tiles (per sq ft)',
+    'Pipes (per meter)',
+    'Wire (per meter)',
+  ];
+
+  void _showPriceReportDialog() {
+    String? selectedProduct;
+    final priceController = TextEditingController();
+    
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Report a New Price'),
+          content: StatefulBuilder(
+            builder: (context, setState) {
+              return Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text('Help the community by reporting current prices at this store:'),
+                  const SizedBox(height: 16),
+                  DropdownButtonFormField<String>(
+                    decoration: const InputDecoration(
+                      labelText: 'Product',
+                      border: OutlineInputBorder(),
+                    ),
+                    value: selectedProduct,
+                    items: _constructionProducts.map((product) {
+                      return DropdownMenuItem(
+                        value: product,
+                        child: Text(product),
+                      );
+                    }).toList(),
+                    onChanged: (value) {
+                      setState(() {
+                        selectedProduct = value;
+                      });
+                    },
+                  ),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: priceController,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(
+                      labelText: 'Price (₹)',
+                      border: OutlineInputBorder(),
+                      prefixText: '₹ ',
+                    ),
+                  ),
+                ],
+              );
+            },
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                if (selectedProduct != null && priceController.text.isNotEmpty) {
+                  final price = double.tryParse(priceController.text);
+                  if (price != null && price > 0) {
+                    Navigator.of(context).pop();
+                    
+                    // Show loading
+                    showDialog(
+                      context: context,
+                      barrierDismissible: false,
+                      builder: (context) => const AlertDialog(
+                        content: Row(
+                          children: [
+                            CircularProgressIndicator(),
+                            SizedBox(width: 16),
+                            Text('Submitting price report...'),
+                          ],
+                        ),
+                      ),
+                    );
+                    
+                    // Submit price report
+                    bool success = await GooglePlacesService.reportPrice(
+                      widget.store.placeId,
+                      selectedProduct!,
+                      price,
+                    );
+                    
+                    Navigator.of(context).pop(); // Close loading dialog
+                    
+                    if (success) {
+                      _showSnackBar('Price reported successfully! Thank you for contributing.');
+                      _loadStoreDetails(); // Refresh the store details to show new price
+                    } else {
+                      _showSnackBar('Failed to report price. Please try again.');
+                    }
+                  } else {
+                    _showSnackBar('Please enter a valid price');
+                  }
+                } else {
+                  _showSnackBar('Please select a product and enter a price');
+                }
+              },
+              child: const Text('Submit'),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   Widget _buildStorePhoto() {
@@ -182,10 +301,175 @@ class _EnhancedStoreDetailsPageState extends State<EnhancedStoreDetailsPage> {
     return Row(children: stars);
   }
 
+  Widget _buildCommunityPricesSection() {
+    if (_storeDetails == null) {
+      return const SizedBox.shrink();
+    }
+
+    return Card(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.monetization_on, color: Color(0xFF1E3A8A)),
+                const SizedBox(width: 8),
+                const Text(
+                  'Community-Reported Prices',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+                const Spacer(),
+                ElevatedButton.icon(
+                  onPressed: _showPriceReportDialog,
+                  icon: const Icon(Icons.add, size: 16),
+                  label: const Text('Report Price'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.orange,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    textStyle: const TextStyle(fontSize: 12),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            
+            if (_storeDetails!.latestPrices.isEmpty)
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.grey[100],
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.grey[300]!),
+                ),
+                child: const Center(
+                  child: Column(
+                    children: [
+                      Icon(Icons.price_check, size: 48, color: Colors.grey),
+                      SizedBox(height: 8),
+                      Text(
+                        'No prices reported yet. Be the first!',
+                        style: TextStyle(
+                          fontSize: 16,
+                          color: Colors.grey,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      SizedBox(height: 4),
+                      Text(
+                        'Help the community by reporting current prices',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
+                  ),
+                ),
+              )
+            else
+              Column(
+                children: _storeDetails!.latestPrices.map((price) {
+                  return Container(
+                    margin: const EdgeInsets.only(bottom: 12),
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.green.shade50,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.green.shade200),
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: Colors.green.shade100,
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: const Icon(
+                            Icons.inventory,
+                            color: Colors.green,
+                            size: 20,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                price.productName,
+                                style: const TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              Text(
+                                _formatTimeAgo(price.lastReported),
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.grey[600],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: Colors.green,
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Text(
+                            '₹${price.price.toStringAsFixed(0)}',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }).toList(),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _formatTimeAgo(String timestamp) {
+    try {
+      final dateTime = DateTime.parse(timestamp);
+      final now = DateTime.now();
+      final difference = now.difference(dateTime);
+      
+      if (difference.inDays > 0) {
+        return 'Reported ${difference.inDays} day${difference.inDays == 1 ? '' : 's'} ago';
+      } else if (difference.inHours > 0) {
+        return 'Reported ${difference.inHours} hour${difference.inHours == 1 ? '' : 's'} ago';
+      } else if (difference.inMinutes > 0) {
+        return 'Reported ${difference.inMinutes} minute${difference.inMinutes == 1 ? '' : 's'} ago';
+      } else {
+        return 'Reported just now';
+      }
+    } catch (e) {
+      return 'Recently reported';
+    }
+  }
+
   Widget _buildActionButtons() {
     // Use detailed information if available
-    String? phoneNumber = _storeDetails?['phone_number'] ?? widget.store.phoneNumber;
-    String? website = _storeDetails?['website'] ?? widget.store.website;
+    String? phoneNumber = _storeDetails?.phoneNumber ?? widget.store.phoneNumber;
+    String? website = _storeDetails?.website ?? widget.store.website;
     
     return Container(
       padding: const EdgeInsets.all(16),
@@ -250,11 +534,11 @@ class _EnhancedStoreDetailsPageState extends State<EnhancedStoreDetailsPage> {
 
   Widget _buildInfoSection() {
     // Use detailed information if available, otherwise fallback to basic store data
-    String storeName = _storeDetails?['name'] ?? widget.store.name;
-    double storeRating = _storeDetails?['rating']?.toDouble() ?? widget.store.rating;
-    int? userRatingsTotal = _storeDetails?['user_ratings_total'] ?? widget.store.userRatingsTotal;
-    String storeAddress = _storeDetails?['formatted_address'] ?? widget.store.formattedAddress ?? widget.store.address;
-    String? phoneNumber = _storeDetails?['phone_number'] ?? widget.store.phoneNumber;
+    String storeName = _storeDetails?.name ?? widget.store.name;
+    double storeRating = _storeDetails?.rating ?? widget.store.rating;
+    int? userRatingsTotal = _storeDetails?.userRatingsTotal ?? widget.store.userRatingsTotal;
+    String storeAddress = _storeDetails?.formattedAddress ?? widget.store.formattedAddress ?? widget.store.address;
+    String? phoneNumber = _storeDetails?.phoneNumber ?? widget.store.phoneNumber;
     
     return Card(
       margin: const EdgeInsets.all(16),
@@ -272,6 +556,8 @@ class _EnhancedStoreDetailsPageState extends State<EnhancedStoreDetailsPage> {
                 fontWeight: FontWeight.bold,
                 color: Color(0xFF1E3A8A),
               ),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
             ),
             const SizedBox(height: 8),
             Row(
@@ -354,7 +640,7 @@ class _EnhancedStoreDetailsPageState extends State<EnhancedStoreDetailsPage> {
 
   Widget _buildOpeningHours() {
     // Use detailed opening hours if available, otherwise fallback to basic store data
-    List<String>? openingHours = _storeDetails?['opening_hours']?.cast<String>() ?? widget.store.openingHours;
+    List<String>? openingHours = _storeDetails?.openingHours ?? widget.store.openingHours;
     
     if (openingHours == null || openingHours.isEmpty) {
       return const SizedBox.shrink();
@@ -445,8 +731,8 @@ class _EnhancedStoreDetailsPageState extends State<EnhancedStoreDetailsPage> {
 
   Widget _buildReviewsSection() {
     // Use detailed reviews if available, otherwise fallback to basic store data
-    List<Map<String, dynamic>>? reviews = _storeDetails?['reviews']?.cast<Map<String, dynamic>>() ?? widget.store.reviews;
-    int? userRatingsTotal = _storeDetails?['user_ratings_total'] ?? widget.store.userRatingsTotal;
+    List<Map<String, dynamic>>? reviews = _storeDetails?.reviews ?? widget.store.reviews;
+    int? userRatingsTotal = _storeDetails?.userRatingsTotal ?? widget.store.userRatingsTotal;
     
     if (reviews == null || reviews.isEmpty) {
       return const SizedBox.shrink();
@@ -603,6 +889,7 @@ class _EnhancedStoreDetailsPageState extends State<EnhancedStoreDetailsPage> {
                   _buildInfoSection(),
                   _buildOpeningHours(),
                   _buildReviewsSection(),
+                  _buildCommunityPricesSection(),
                   if (_isLoadingDetails)
                     const Padding(
                       padding: EdgeInsets.all(32),

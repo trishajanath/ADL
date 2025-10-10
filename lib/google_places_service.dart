@@ -3,6 +3,77 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:geolocator/geolocator.dart';
 
+// Model for reported prices
+class ReportedPrice {
+  final String productName;
+  final double price;
+  final String lastReported;
+
+  ReportedPrice({
+    required this.productName,
+    required this.price,
+    required this.lastReported,
+  });
+
+  factory ReportedPrice.fromJson(Map<String, dynamic> json) {
+    return ReportedPrice(
+      productName: json['product_name'] ?? '',
+      price: (json['price'] ?? 0.0).toDouble(),
+      lastReported: json['last_reported'] ?? '',
+    );
+  }
+}
+
+// Model for detailed store information
+class StoreDetails {
+  final String name;
+  final String formattedAddress;
+  final String? phoneNumber;
+  final String? website;
+  final double rating;
+  final int userRatingsTotal;
+  final int? priceLevel;
+  final List<String> types;
+  final List<String> openingHours;
+  final List<Map<String, dynamic>> reviews;
+  final List<String> photos;
+  final List<ReportedPrice> latestPrices;
+
+  StoreDetails({
+    required this.name,
+    required this.formattedAddress,
+    this.phoneNumber,
+    this.website,
+    required this.rating,
+    required this.userRatingsTotal,
+    this.priceLevel,
+    required this.types,
+    required this.openingHours,
+    required this.reviews,
+    required this.photos,
+    required this.latestPrices,
+  });
+
+  factory StoreDetails.fromJson(Map<String, dynamic> json) {
+    return StoreDetails(
+      name: json['name'] ?? 'Unknown Store',
+      formattedAddress: json['formatted_address'] ?? '',
+      phoneNumber: json['phone_number'],
+      website: json['website'],
+      rating: (json['rating'] ?? 0.0).toDouble(),
+      userRatingsTotal: json['user_ratings_total'] ?? 0,
+      priceLevel: json['price_level'],
+      types: (json['types'] as List<dynamic>?)?.cast<String>() ?? [],
+      openingHours: (json['opening_hours'] as List<dynamic>?)?.cast<String>() ?? [],
+      reviews: (json['reviews'] as List<dynamic>?)?.cast<Map<String, dynamic>>() ?? [],
+      photos: (json['photos'] as List<dynamic>?)?.cast<String>() ?? [],
+      latestPrices: (json['latest_prices'] as List<dynamic>?)
+          ?.map((price) => ReportedPrice.fromJson(price as Map<String, dynamic>))
+          .toList() ?? [],
+    );
+  }
+}
+
 class ConstructionStore {
   final String placeId;
   final String name;
@@ -217,6 +288,67 @@ class GooglePlacesService {
     } catch (e) {
       print('❌ Error getting store details: $e');
       return null;
+    }
+  }
+
+  static Future<StoreDetails?> getStoreDetailsComplete(String placeId) async {
+    try {
+      print('🔍 Fetching complete store details for place_id: $placeId');
+      
+      final response = await http.get(
+        Uri.parse('$_backendUrl/api/v1/store-details/$placeId'),
+      );
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        
+        if (data['error'] != null) {
+          print('❌ Backend API Error: ${data['error']}');
+          return null;
+        }
+        
+        final details = data['details'] as Map<String, dynamic>;
+        print('✅ Retrieved complete store details with ${details['latest_prices']?.length ?? 0} price reports');
+        return StoreDetails.fromJson(details);
+      } else {
+        print('❌ HTTP Error: ${response.statusCode}');
+        return null;
+      }
+    } catch (e) {
+      print('❌ Error getting complete store details: $e');
+      return null;
+    }
+  }
+
+  static Future<bool> reportPrice(String placeId, String productName, double price) async {
+    try {
+      print('💰 Reporting price for $productName at store $placeId: ₹$price');
+      
+      final response = await http.post(
+        Uri.parse('$_backendUrl/api/v1/stores/$placeId/prices'),
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({
+          'product_name': productName,
+          'price': price,
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        if (data['success'] == true) {
+          print('✅ Price reported successfully');
+          return true;
+        } else {
+          print('❌ Price report failed: ${data['error']}');
+          return false;
+        }
+      } else {
+        print('❌ HTTP Error reporting price: ${response.statusCode}');
+        return false;
+      }
+    } catch (e) {
+      print('❌ Error reporting price: $e');
+      return false;
     }
   }
 }
