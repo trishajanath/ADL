@@ -2,6 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:my_app/models/project.dart';
 import 'package:my_app/projects_service.dart';
 import 'package:my_app/widgets/task_list.dart';
+import 'package:my_app/widgets/expense_list.dart';
+import 'package:my_app/widgets/expense_tracker.dart';
+import 'package:my_app/models/expense.dart';
+import 'package:my_app/widgets/add_expense_form.dart';
 
 class ProjectDetailsPage extends StatefulWidget {
   final int projectId;
@@ -23,8 +27,51 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> {
 
   void _loadProjectDetails() {
     setState(() {
-      _projectDetailsFuture = ProjectsService.getProjectDetails(widget.projectId);
+      _projectDetailsFuture =
+          ProjectsService.getProjectDetails(widget.projectId);
     });
+  }
+
+  void _showAddExpenseForm() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) => Padding(
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.of(context).viewInsets.bottom,
+        ),
+        child: AddExpenseForm(
+          projectId: widget.projectId,
+          onExpenseAdded: (Expense newExpense) async {
+            try {
+              await ProjectsService.addExpense(
+                projectId: widget.projectId,
+                description: newExpense.description,
+                amount: newExpense.amount,
+                category: newExpense.category,
+                date: newExpense.date,
+              );
+              Navigator.of(context).pop(); // Close the bottom sheet
+              _loadProjectDetails(); // Refresh the details
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Expense added successfully!'),
+                  backgroundColor: Colors.green,
+                ),
+              );
+            } catch (e) {
+              Navigator.of(context).pop(); // Close the bottom sheet
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Failed to add expense: $e'),
+                  backgroundColor: Colors.red,
+                ),
+              );
+            }
+          },
+        ),
+      ),
+    );
   }
 
   @override
@@ -62,6 +109,7 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> {
             final projectDetails = snapshot.data!;
             final project = projectDetails;
             final tasks = projectDetails.tasks;
+            final expenses = projectDetails.expenses;
 
             return RefreshIndicator(
               onRefresh: () async {
@@ -72,7 +120,14 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> {
                 children: [
                   _buildProjectHeader(project),
                   const SizedBox(height: 24),
-                  TaskList(tasks: tasks, projectId: project.id, onTaskUpdated: _loadProjectDetails),
+                  ExpenseTracker(budget: project.budget, expenses: expenses),
+                  const SizedBox(height: 16),
+                  ExpenseList(expenses: expenses),
+                  const SizedBox(height: 16),
+                  TaskList(
+                      tasks: tasks,
+                      projectId: project.id,
+                      onTaskUpdated: _loadProjectDetails),
                 ],
               ),
             );
@@ -80,6 +135,11 @@ class _ProjectDetailsPageState extends State<ProjectDetailsPage> {
             return const Center(child: Text('No project details found.'));
           }
         },
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: _showAddExpenseForm,
+        tooltip: 'Add Expense',
+        child: const Icon(Icons.add),
       ),
     );
   }

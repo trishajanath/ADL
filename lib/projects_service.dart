@@ -195,4 +195,28 @@ class ProjectsService {
       throw Exception('Failed to update task status: ${response.statusCode}');
     }
   }
+
+  /// Add a new expense to a project
+  static Future<void> addExpense({
+    required int projectId,
+    required String description,
+    required double amount,
+    required String category,
+    required String date,
+  }) async {
+    final response = await http.post(
+      Uri.parse('$_baseUrl/api/v1/projects/$projectId/expenses'),
+      headers: {'Content-Type': 'application/json'},
+      body: json.encode({
+        'description': description,
+        'amount': amount,
+        'category': category,
+        'date': date,
+      }),
+    );
+
+    if (response.statusCode != 200) {
+      throw Exception('Failed to add expense: ${response.statusCode}');
+    }
+  }
 }

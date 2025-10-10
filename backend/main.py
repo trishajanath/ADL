@@ -276,6 +276,12 @@ class Project(BaseModel):
     description: str
     status: str
 
+class ExpenseCreate(BaseModel):
+    description: str
+    amount: float
+    category: str
+    date: str
+
 # Database initialization
 def init_db():
     """Initialize the SQLite database for storing community-reported prices"""
@@ -335,6 +341,19 @@ def init_db():
             is_completed BOOLEAN DEFAULT FALSE,
             created_at TEXT NOT NULL,
             completed_at TEXT,
+            FOREIGN KEY (project_id) REFERENCES projects (id) ON DELETE CASCADE
+        )
+    ''')
+
+    # Create expenses table
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS expenses (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            project_id INTEGER NOT NULL,
+            description TEXT NOT NULL,
+            amount REAL NOT NULL,
+            category TEXT NOT NULL,
+            date TEXT NOT NULL,
             FOREIGN KEY (project_id) REFERENCES projects (id) ON DELETE CASCADE
         )
     ''')
@@ -1059,7 +1078,7 @@ async def update_task(project_id: int, task_id: int, is_completed: bool):
 @app.get("/api/v1/projects/{project_id}")
 async def get_project(project_id: int):
     """
-    Get a specific project by ID, including its tasks
+    Get a specific project by ID, including its tasks and expenses
     """
     try:
         conn = sqlite3.connect('store_prices.db')
@@ -1090,19 +1109,30 @@ async def get_project(project_id: int):
         ''', (project_id,))
         
         tasks = [dict(row) for row in cursor.fetchall()]
+
+        # Get project expenses
+        cursor.execute('''
+            SELECT id, description, amount, category, date
+            FROM expenses
+            WHERE project_id = ?
+            ORDER BY date DESC
+        ''', (project_id,))
+        
+        expenses = [dict(row) for row in cursor.fetchall()]
         
         conn.close()
         
-        # Combine project details with tasks
-        project_with_tasks = {
+        # Combine project details with tasks and expenses
+        project_with_details = {
             "project": project,
-            "tasks": tasks
+            "tasks": tasks,
+            "expenses": expenses
         }
         
-        print(f"✅ Retrieved project '{project['name']}' with {len(tasks)} tasks")
+        print(f"✅ Retrieved project '{project['name']}' with {len(tasks)} tasks and {len(expenses)} expenses")
         return {
             "success": True,
-            "data": project_with_tasks
+            "data": project_with_details
         }
         
     except HTTPException:
@@ -1110,6 +1140,56 @@ async def get_project(project_id: int):
     except Exception as e:
         print(f"❌ Error getting project: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to get project: {str(e)}")
+
+@app.post("/api/v1/projects/{project_id}/expenses")
+async def add_expense_to_project(project_id: int, expense: ExpenseCreate):
+    """
+    Add a new expense to a specific project
+    """
+    try:
+        conn = sqlite3.connect('store_prices.db')
+        cursor = conn.cursor()
+
+        # Check if project exists
+        cursor.execute("SELECT id FROM projects WHERE id = ?", (project_id,))
+        if not cursor.fetchone():
+            conn.close()
+            raise HTTPException(status_code=404, detail="Project not found")
+
+        # Insert new expense
+        cursor.execute('''
+            INSERT INTO expenses (project_id, description, amount, category, date)
+            VALUES (?, ?, ?, ?, ?)
+        ''', (
+            project_id,
+            expense.description,
+            expense.amount,
+            expense.category,
+            expense.date
+        ))
+        
+        expense_id = cursor.lastrowid
+        conn.commit()
+        conn.close()
+        
+        print(f"✅ Added expense {expense_id} to project {project_id}")
+        
+        return {
+            "success": True,
+            "message": "Expense added successfully",
+            "expense_id": expense_id,
+            "expense": {
+                "id": expense_id,
+                "project_id": project_id,
+                **expense.dict()
+            }
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ Error adding expense: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to add expense: {str(e)}")
 
 @app.get("/api/v1/store-photo/{photo_reference}")
 async def get_store_photo(photo_reference: str, maxwidth: int = 400):

@@ -1,4 +1,5 @@
 import 'task.dart';
+import 'expense.dart';
 
 class Project {
   final int id;
@@ -50,10 +51,12 @@ class Project {
 
 class ProjectDetails extends Project {
   final List<ProjectTask> tasks;
+  final List<Expense> expenses;
 
   ProjectDetails({
     required Project project,
     required this.tasks,
+    required this.expenses,
   }) : super(
           id: project.id,
           name: project.name,
@@ -68,12 +71,15 @@ class ProjectDetails extends Project {
   factory ProjectDetails.fromJson(Map<String, dynamic> json) {
     final projectData = json['project'] as Map<String, dynamic>;
     final tasksData = json['tasks'] as List;
+    final expensesData = json['expenses'] as List;
     final project = Project.fromJson(projectData);
     final tasks = tasksData.map((taskJson) => ProjectTask.fromJson(taskJson)).toList();
+    final expenses = expensesData.map((expenseJson) => Expense.fromJson(expenseJson)).toList();
 
     return ProjectDetails(
       project: project,
       tasks: tasks,
+      expenses: expenses,
     );
   }
 }
