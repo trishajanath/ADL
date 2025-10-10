@@ -1,12 +1,11 @@
+// shop_search_page.dart - SIMPLIFIED AND ROBUST VERSION
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert' as convert;
-import 'dart:async'; // Import for Future
 import 'location_service.dart';
 import 'google_places_service.dart';
-import 'enhanced_store_details_page.dart';
 
 class ShopSearchPage extends StatefulWidget {
   const ShopSearchPage({super.key});
@@ -16,385 +15,221 @@ class ShopSearchPage extends StatefulWidget {
 }
 
 class _ShopSearchPageState extends State<ShopSearchPage> {
-  // --- STATE VARIABLES ---
   final TextEditingController _searchController = TextEditingController();
-  final TextEditingController _addressController = TextEditingController();
+  
   List<ConstructionStore> _stores = [];
   bool _isLoading = false;
   Position? _currentPosition;
-  String _statusMessage = 'Tap the button to find stores near you.';
+  String _statusMessage = ''; // User-facing status message
 
-  /// This is the main function that handles the entire user flow.
-  Future<void> _getUserLocationAndSearch() async {
-    // --- STEP 1: RESET STATE AND START LOADING ---
-    if (mounted) {
-      setState(() {
-        _isLoading = true;
-        _stores = [];
-        _currentPosition = null; // Important: Clear any old position
-        _statusMessage = 'Requesting location permission...';
-      });
-    }
-    print('=== 🎯 AUTOMATIC LOCATION FLOW STARTED ===');
-
-    try {
-      // --- STEP 2: REQUEST PERMISSION ---
-      print('1️⃣ Requesting location permission...');
-      bool hasPermission = await LocationService.requestLocationPermission();
-      
-      if (!hasPermission) {
-        print('❌ Permission Denied by User.');
-        if (mounted) {
-          setState(() {
-            _statusMessage = 'Location permission is required to find nearby stores.';
-            _isLoading = false;
-          });
-        }
-        return;
-      }
-
-      // --- STEP 3: GET PRECISE, FRESH LOCATION ---
-      print('2️⃣ Permission granted! Getting your precise location...');
-      if (mounted) {
-        setState(() => _statusMessage = 'Getting your precise location...');
-      }
-      
-      // Try multiple location methods for maximum accuracy
-      Position position = await _getPreciseLocation();
-
-      print('✅ SUCCESS! Fetched location: ${position.latitude}, ${position.longitude}');
-      print('📊 Location details: accuracy=${position.accuracy}m, timestamp=${position.timestamp}');
-      
-      // Check if this looks like simulator coordinates
-      bool isSimulator = _isSimulatorLocation(position);
-      print(isSimulator ? '⚠️ SIMULATOR DETECTED: This is the default iOS Simulator location' : '🎯 REAL LOCATION: This appears to be actual GPS coordinates');
-      
-      // --- STEP 4: HANDLE REAL VS SIMULATOR LOCATION ---
-      if (isSimulator) {
-        print('🤖 SIMULATOR WORKAROUND: Will show SF stores but inform user');
-        if (mounted) {
-          setState(() {
-            _currentPosition = position;
-            _statusMessage = '⚠️ iOS Simulator detected - showing San Francisco area stores.\nOn a real device, this will show stores near your actual location.';
-          });
-        }
-      } else {
-        // Real GPS coordinates - proceed with full confidence
-        if (mounted) {
-          setState(() {
-            _currentPosition = position;
-            _statusMessage = 'Found your location! Searching for nearby stores...';
-          });
-        }
-      }
-
-      await _searchNearbyStores();
-
-    } catch (e) {
-      print('❌ FAILED to get location: $e');
-      if (mounted) {
-        setState(() {
-          _statusMessage = 'Could not access your location automatically.\nPlease ensure location services are enabled.';
-          _isLoading = false;
-        });
-      }
-      
-      // Fallback to manual location after a delay
-      Future.delayed(Duration(seconds: 2), () {
-        if (mounted) {
-          _showManualLocationPicker();
-        }
-      });
-    }
+  @override
+  void initState() {
+    super.initState();
+    // DO NOT auto-request anything - wait for user to tap button
+    print('🚀 Shop search page initialized - waiting for user action');
   }
 
-  /// Get the most precise location possible
-  Future<Position> _getPreciseLocation() async {
-    try {
-      // First try: High accuracy with longer timeout
-      return await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.best,
-        timeLimit: const Duration(seconds: 30),
-      );
-    } catch (e) {
-      print('⚠️ Best accuracy failed, trying high accuracy: $e');
-      try {
-        // Second try: High accuracy with medium timeout
-        return await Geolocator.getCurrentPosition(
-          desiredAccuracy: LocationAccuracy.high,
-          timeLimit: const Duration(seconds: 20),
-        );
-      } catch (e) {
-        print('⚠️ High accuracy failed, trying medium accuracy: $e');
-        // Final try: Medium accuracy
-        return await Geolocator.getCurrentPosition(
-          desiredAccuracy: LocationAccuracy.medium,
-          timeLimit: const Duration(seconds: 15),
-        );
-      }
-    }
-  }
-
-  /// Helper to detect iOS Simulator default coordinates
+  // --- Main Logic: Request Permission and Get Fresh Location ---
+  // Helper method to detect simulator location
   bool _isSimulatorLocation(Position position) {
+    // Common iOS Simulator default coordinates
     const double sfLat = 37.785834;
     const double sfLng = -122.406417;
-    const double tolerance = 0.001;
+    const double tolerance = 0.001; // Very small tolerance for exact match
     
     return (position.latitude - sfLat).abs() < tolerance && 
            (position.longitude - sfLng).abs() < tolerance;
   }
 
-  /// This function calls your backend to get the list of stores.
-  Future<void> _searchNearbyStores() async {
-    if (_currentPosition == null) {
-      print('❌ Search cancelled: current position is null.');
-      return;
+  Future<void> _getUserLocationAndSearch() async {
+    setState(() {
+      _isLoading = true;
+      _stores = [];
+      _currentPosition = null; // Clear any previous location
+      _statusMessage = 'Requesting location permission...';
+    });
+
+    try {
+      print('🔐 STEP 1: User tapped "Use My Location" - requesting permission...');
+      
+      // 1. Request permission using your service
+      bool hasPermission = await LocationService.requestLocationPermission();
+      
+      if (!hasPermission) {
+        print('❌ STEP 2: Permission denied by user');
+        setState(() {
+          _statusMessage = 'Location permission is required to find nearby stores.\n\nPlease allow location access or try "Set Location Manually" below.';
+          _isLoading = false;
+        });
+        return;
+      }
+
+      print('✅ STEP 2: Permission granted! Getting FRESH location...');
+      
+      // 2. If permission is granted, get a FRESH location directly
+      setState(() => _statusMessage = 'Permission granted! Getting your current location...');
+      
+      // Use Geolocator directly to get the most current location
+      Position position = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.medium, // Balance between accuracy and speed
+        timeLimit: Duration(seconds: 15), // Reasonable timeout
+      );
+      
+      print('✅ STEP 3: Fresh location obtained - ${position.latitude}, ${position.longitude}');
+      
+      // Check if this is a simulator location
+      bool isSimulatorLocation = _isSimulatorLocation(position);
+      
+      // Handle simulator vs real device locations
+      if (isSimulatorLocation) {
+        print('⚠️ STEP 4: Default simulator location detected - trying to get real location');
+        
+        // Try to get user's real location through IP geolocation as fallback
+        Position? realLocation = await _tryGetRealLocationViaIP();
+        
+        if (realLocation != null) {
+          print('✅ SUCCESS: Got real location via IP: ${realLocation.latitude}, ${realLocation.longitude}');
+          setState(() {
+            _currentPosition = realLocation;
+            _statusMessage = 'Found your approximate location!\nSearching for nearby stores...';
+          });
+          await _searchNearbyStores();
+        } else {
+          // Fallback: Guide user to set location manually
+          setState(() {
+            _currentPosition = null;
+            _statusMessage = '📱 iOS Simulator Detected\n\n🌍 To find stores near you:\n1. Use "Set Location Manually" below\n2. Enter your city/address\n\nOr set custom location in Simulator:\nDevice → Location → Custom Location';
+            _isLoading = false;
+          });
+        }
+      } else {
+        // Real GPS coordinates - proceed with confidence
+        print('🎯 STEP 4: Real location detected');
+        setState(() {
+          _currentPosition = position;
+          _statusMessage = 'Location found: ${position.latitude.toStringAsFixed(4)}, ${position.longitude.toStringAsFixed(4)}\nSearching for stores...';
+        });
+        await _searchNearbyStores();
+      }
+
+    } catch (e) {
+      print('❌ Error in location flow: $e');
+      setState(() {
+        _statusMessage = 'Error: Could not get your location.\n\nTry:\n• Check location settings\n• Use "Set Location Manually" below';
+        _isLoading = false;
+      });
     }
+  }
+
+  // --- IP Geolocation Fallback ---
+  Future<Position?> _tryGetRealLocationViaIP() async {
+    try {
+      print('🌐 Attempting to get real location via IP geolocation...');
+      
+      // Use a free IP geolocation service
+      final response = await http.get(
+        Uri.parse('http://ip-api.com/json/'),
+        headers: {'Accept': 'application/json'},
+      ).timeout(const Duration(seconds: 10));
+
+      if (response.statusCode == 200) {
+        final data = convert.jsonDecode(response.body);
+        
+        if (data['status'] == 'success') {
+          double lat = data['lat'].toDouble();
+          double lon = data['lon'].toDouble();
+          String city = data['city'] ?? 'Unknown';
+          String country = data['country'] ?? 'Unknown';
+          
+          print('✅ IP Geolocation success: $city, $country ($lat, $lon)');
+          
+          // Create a Position object with the IP-based coordinates
+          return Position(
+            latitude: lat,
+            longitude: lon,
+            timestamp: DateTime.now(),
+            accuracy: 1000.0, // Lower accuracy for IP-based location
+            altitude: 0.0,
+            heading: 0.0,
+            speed: 0.0,
+            speedAccuracy: 0.0,
+            altitudeAccuracy: 0.0,
+            headingAccuracy: 0.0,
+          );
+        }
+      }
+      
+      print('❌ IP Geolocation failed: ${response.statusCode}');
+      return null;
+    } catch (e) {
+      print('❌ Error getting IP location: $e');
+      return null;
+    }
+  }
+
+  // --- API Call Logic ---
+  Future<void> _searchNearbyStores() async {
+    if (_currentPosition == null) return;
     
     String query = _searchController.text.trim().isEmpty 
                    ? "construction supply store" 
                    : _searchController.text.trim();
-    
-    print('3️⃣ Calling backend to search for "$query" near ${_currentPosition!.latitude}, ${_currentPosition!.longitude}');
 
     setState(() {
       _statusMessage = "Searching for '$query' near your location...";
     });
 
     try {
+      print('🔍 STEP 4: Calling backend API for stores near ${_currentPosition!.latitude}, ${_currentPosition!.longitude}');
+      
       List<ConstructionStore> stores = await GooglePlacesService.searchNearbyStores(
         latitude: _currentPosition!.latitude,
         longitude: _currentPosition!.longitude,
         query: query,
       );
 
-      print('4️⃣ Backend returned ${stores.length} stores.');
+      print('✅ STEP 5: Found ${stores.length} stores from backend');
 
       setState(() {
         _stores = stores;
         _isLoading = false;
         if (stores.isEmpty) {
-          _statusMessage = "No '$query' stores found in your area.\n\nTry a different search term.";
+          _statusMessage = "No '$query' stores found in your area.\n\nTry a different search term or location.";
         } else {
           _statusMessage = "Found ${stores.length} stores near you";
         }
       });
     } catch (e) {
-      print('❌ FAILED to get stores from backend: $e');
+      print('❌ Error searching for stores: $e');
       setState(() {
-        _statusMessage = 'Error searching for stores: $e';
+        _statusMessage = 'Error searching for stores: $e\n\nCheck if backend server is running.';
         _isLoading = false;
       });
-    } finally {
-      print('=== 🏁 LOCATION FLOW FINISHED ===');
     }
   }
 
-  /// Geocode an address and search for nearby stores
-  Future<void> _geocodeAndSearch(String address) async {
-    if (mounted) {
-      setState(() {
-        _isLoading = true;
-        _statusMessage = 'Finding location for: $address...';
-      });
-    }
-
-    try {
-      print('🗺️ GEOCODING: Converting address "$address" to coordinates');
-      
-      // Use Google's Geocoding API via our backend
-      final response = await http.post(
-        Uri.parse('http://127.0.0.1:8000/api/v1/geocode'),
-        headers: {'Content-Type': 'application/json'},
-        body: convert.jsonEncode({'address': address}),
-      );
-
-      if (response.statusCode == 200) {
-        final data = convert.jsonDecode(response.body);
-        if (data['success'] == true && data['location'] != null) {
-          double lat = data['location']['latitude'];
-          double lng = data['location']['longitude'];
-          
-          print('✅ GEOCODED: $address → $lat, $lng');
-          
-          if (mounted) {
-            setState(() {
-              _currentPosition = Position(
-                latitude: lat,
-                longitude: lng,
-                timestamp: DateTime.now(),
-                accuracy: 5.0,
-                altitude: 0,
-                heading: 0,
-                speed: 0,
-                speedAccuracy: 0,
-                altitudeAccuracy: 0,
-                headingAccuracy: 0,
-              );
-              _statusMessage = 'Found location: $address\nSearching for stores...';
-            });
-          }
-
-          await _searchNearbyStores();
-        } else {
-          if (mounted) {
-            setState(() {
-              _statusMessage = 'Could not find location for: $address\nTry a more specific address.';
-              _isLoading = false;
-            });
-          }
-        }
-      } else {
-        throw Exception('Geocoding service unavailable');
-      }
-    } catch (e) {
-      print('❌ GEOCODING FAILED: $e');
-      if (mounted) {
-        setState(() {
-          _statusMessage = 'Error finding location. Please try again or select a city.';
-          _isLoading = false;
-        });
-      }
-    }
-  }
-
-  /// Show manual location picker for users who want to override GPS
+  // --- Manual Location Setting ---
   void _showManualLocationPicker() {
     showDialog(
       context: context,
-      barrierDismissible: false, // Force user to make a choice
       builder: (context) => AlertDialog(
-        title: Row(
-          children: [
-            Icon(Icons.location_city, color: Colors.orange),
-            SizedBox(width: 8),
-            Text('Set Your Location'),
-          ],
-        ),
+        title: const Text('Set Your Location'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Container(
-              padding: EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.blue.shade50,
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.blue.shade200),
-              ),
-              child: Row(
-                children: [
-                  Icon(Icons.info_outline, color: Colors.blue.shade700, size: 20),
-                  SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'Enter your specific address to find the closest stores',
-                      style: TextStyle(
-                        color: Colors.blue.shade700,
-                        fontSize: 14,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 20),
-            
-            // Address input field
-            TextField(
-              controller: _addressController,
-              decoration: InputDecoration(
-                labelText: 'Enter your address',
-                hintText: 'e.g., RS Puram, Coimbatore or MG Road, Bangalore',
-                prefixIcon: Icon(Icons.home, color: Colors.orange),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  borderSide: BorderSide(color: Colors.orange, width: 2),
-                ),
-              ),
-              maxLines: 2,
-              textCapitalization: TextCapitalization.words,
-            ),
-            
+            const Text('Choose a city:'),
             const SizedBox(height: 16),
             
-            // Quick action buttons
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: () {
-                      Navigator.pop(context);
-                      _showQuickCityPicker();
-                    },
-                    icon: Icon(Icons.location_city, size: 16),
-                    label: Text('Quick Cities'),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: Colors.grey.shade600,
-                      side: BorderSide(color: Colors.grey.shade300),
-                    ),
-                  ),
-                ),
-                SizedBox(width: 12),
-                Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: () {
-                      if (_addressController.text.trim().isNotEmpty) {
-                        Navigator.pop(context);
-                        _geocodeAndSearch(_addressController.text.trim());
-                      }
-                    },
-                    icon: Icon(Icons.search, size: 16),
-                    label: Text('Search'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.orange,
-                      foregroundColor: Colors.white,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-              setState(() {
-                _statusMessage = 'Please enter your address to find nearby stores.';
-                _isLoading = false;
-              });
-            },
-            child: const Text('Cancel', style: TextStyle(color: Colors.grey)),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showQuickCityPicker() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text('Quick City Selection'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text('Select a city center (you can refine your address later):'),
-            const SizedBox(height: 16),
+            // Quick city buttons
             Wrap(
               spacing: 8,
-              runSpacing: 8,
               children: [
-                _buildCityButton('🏭 Coimbatore', 11.0168, 76.9558, 'Tamil Nadu • Industrial Hub'),
-                _buildCityButton('🌆 Bangalore', 12.9716, 77.5946, 'Karnataka • Tech City'),
-                _buildCityButton('🏖️ Chennai', 13.0827, 80.2707, 'Tamil Nadu • Port City'),
-                _buildCityButton('🏙️ Mumbai', 19.0760, 72.8777, 'Maharashtra • Financial Capital'),
-                _buildCityButton('🏛️ Delhi', 28.7041, 77.1025, 'NCR • National Capital'),
-                _buildCityButton('💎 Hyderabad', 17.3850, 78.4867, 'Telangana • Cyberabad'),
+                _buildCityButton('Coimbatore', 11.0168, 76.9558),
+                _buildCityButton('Bangalore', 12.9716, 77.5946),
+                _buildCityButton('Mumbai', 19.0760, 72.8777),
+                _buildCityButton('Delhi', 28.7041, 77.1025),
+                _buildCityButton('Chennai', 13.0827, 80.2707),
+                _buildCityButton('Hyderabad', 17.3850, 78.4867),
               ],
             ),
           ],
@@ -402,458 +237,324 @@ class _ShopSearchPageState extends State<ShopSearchPage> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Back'),
+            child: const Text('Cancel'),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildCityButton(String city, double lat, double lng, String subtitle) {
-    return Container(
-      width: double.infinity,
-      margin: EdgeInsets.only(bottom: 8),
-      child: ElevatedButton(
-        onPressed: () {
-          Navigator.pop(context);
-          _setManualLocation(lat, lng, city.replaceAll(RegExp(r'[🏭🌆🏖️🏙️🏛️💎]\s*'), ''));
-        },
-        style: ElevatedButton.styleFrom(
-          backgroundColor: Colors.orange,
-          foregroundColor: Colors.white,
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              city, 
-              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-            ),
-            Text(
-              subtitle,
-              style: const TextStyle(fontSize: 12, color: Colors.white70),
-            ),
-          ],
-        ),
+  Widget _buildCityButton(String city, double lat, double lng) {
+    return ElevatedButton(
+      onPressed: () {
+        _setManualLocation(lat, lng, city);
+        Navigator.pop(context);
+      },
+      style: ElevatedButton.styleFrom(
+        backgroundColor: Colors.orange,
+        foregroundColor: Colors.white,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       ),
+      child: Text(city, style: const TextStyle(fontSize: 12)),
     );
   }
 
   void _setManualLocation(double lat, double lng, String cityName) {
-    print('📍 MANUAL LOCATION: User set location to $cityName ($lat, $lng)');
+    print('📍 MANUAL: User set location to $cityName ($lat, $lng)');
     setState(() {
       _currentPosition = Position(
         latitude: lat,
         longitude: lng,
         timestamp: DateTime.now(),
-        accuracy: 0,
-        altitude: 0,
-        heading: 0,
-        speed: 0,
-        speedAccuracy: 0,
-        altitudeAccuracy: 0,
-        headingAccuracy: 0,
+        accuracy: 10.0,
+        altitude: 0.0,
+        heading: 0.0,
+        speed: 0.0,
+        speedAccuracy: 0.0,
+        altitudeAccuracy: 0.0,
+        headingAccuracy: 0.0,
       );
-      _statusMessage = 'Location set to $cityName\nSearching for stores...';
+      _isLoading = true;
+      _statusMessage = 'Location set to $cityName. Searching for stores...';
     });
-
+    
+    // Immediately search for stores at this location
     _searchNearbyStores();
   }
 
-  // Helper methods for store actions
-  Future<void> _getDirections(ConstructionStore store) async {
-    final url = 'https://www.google.com/maps/dir/?api=1&destination=${store.latitude},${store.longitude}';
+  // --- Helper Methods ---
+  Future<void> _openGoogleMaps(ConstructionStore store) async {
+    final url = 'https://www.google.com/maps/search/?api=1&query=${store.latitude},${store.longitude}';
     if (await canLaunchUrl(Uri.parse(url))) {
-      await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
-    } else {
-      _showSnackBar('Could not open directions');
+      await launchUrl(Uri.parse(url));
     }
   }
 
-  Future<void> _callStore(ConstructionStore store) async {
-    if (store.phoneNumber != null && store.phoneNumber!.isNotEmpty) {
-      final url = 'tel:${store.phoneNumber}';
+  Future<void> _callStore(String? phoneNumber) async {
+    if (phoneNumber != null) {
+      final url = 'tel:$phoneNumber';
       if (await canLaunchUrl(Uri.parse(url))) {
         await launchUrl(Uri.parse(url));
-      } else {
-        _showSnackBar('Could not make phone call');
       }
-    } else {
-      _showSnackBar('Phone number not available for this store');
     }
   }
 
-  void _viewStoreDetails(ConstructionStore store) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => EnhancedStoreDetailsPage(store: store),
-      ),
-    );
-  }
-
-  void _showSnackBar(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        duration: const Duration(seconds: 2),
-      ),
-    );
-  }
-
-  String _formatDistance(double distanceKm) {
-    if (distanceKm < 1) {
-      return '${(distanceKm * 1000).round()}m away';
+  String _formatDistance(double distanceInMeters) {
+    if (distanceInMeters < 1000) {
+      return '${distanceInMeters.round()}m';
     } else {
-      return '${distanceKm.toStringAsFixed(1)}km away';
+      return '${(distanceInMeters / 1000).toStringAsFixed(1)}km';
     }
   }
 
-  @override
-  void dispose() {
-    _searchController.dispose();
-    _addressController.dispose();
-    super.dispose();
-  }
-
+  // --- UI ---
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Find Nearby Stores'),
+        title: const Text('Find Construction Stores'),
         backgroundColor: Colors.orange,
         foregroundColor: Colors.white,
       ),
-      body: _currentPosition == null 
-        ? _buildPermissionRequestView() 
-        : _buildSearchResultsView(),
-    );
-  }
-
-  /// View shown BEFORE a location is acquired.
-  Widget _buildPermissionRequestView() {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24.0),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(Icons.location_on, color: Colors.orange, size: 80),
-            const SizedBox(height: 24),
-            const Text(
-              'Find Construction Stores Near You',
-              style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 16),
-            const Text(
-              'We\'ll automatically find your precise location and show you the closest stores.',
-              style: TextStyle(fontSize: 16, color: Colors.grey),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 32),
-            
-            if (_isLoading) ...[
-              const CircularProgressIndicator(color: Colors.orange),
-              const SizedBox(height: 16),
-              Text(_statusMessage, textAlign: TextAlign.center, style: TextStyle(color: Colors.orange.shade700)),
-            ] else ...[
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton.icon(
-                  onPressed: _getUserLocationAndSearch,
-                  icon: const Icon(Icons.my_location),
-                  label: const Text('Find Stores Near Me'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.orange,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-                    textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 12),
-              TextButton.icon(
-                onPressed: _showManualLocationPicker,
-                icon: const Icon(Icons.edit_location, size: 18),
-                label: const Text('Or set location manually'),
-                style: TextButton.styleFrom(
-                  foregroundColor: Colors.grey.shade600,
-                  textStyle: const TextStyle(fontSize: 14),
-                ),
-              ),
-            ],
-            
-            if (_statusMessage.isNotEmpty && !_isLoading) ...[
-              const SizedBox(height: 24),
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: _statusMessage.contains('Simulator') 
-                    ? Colors.orange.shade50 
-                    : Colors.red.shade50,
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(
-                    color: _statusMessage.contains('Simulator') 
-                      ? Colors.orange.shade200 
-                      : Colors.red.shade200
-                  ),
-                ),
-                child: Row(
-                  children: [
-                    Icon(
-                      _statusMessage.contains('Simulator') 
-                        ? Icons.info_outline 
-                        : Icons.error_outline,
-                      color: _statusMessage.contains('Simulator') 
-                        ? Colors.orange.shade700 
-                        : Colors.red.shade700,
-                      size: 20,
-                    ),
-                    SizedBox(width: 12),
-                    Expanded(
-                      child: Text(
-                        _statusMessage, 
-                        style: TextStyle(
-                          color: _statusMessage.contains('Simulator') 
-                            ? Colors.orange.shade700 
-                            : Colors.red.shade700
+      body: Column(
+        children: [
+          // If we DON'T have a location yet, show the permission request view
+          if (_currentPosition == null)
+            Expanded(
+              child: Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(24.0),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(Icons.location_on, color: Colors.orange, size: 60),
+                      const SizedBox(height: 16),
+                      const Text(
+                        'Find Construction Stores Near You',
+                        style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 8),
+                      const Text(
+                        'Grant location permission to see construction supply stores, hardware stores, and building materials shops in your area.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(fontSize: 14, color: Colors.grey),
+                      ),
+                      const SizedBox(height: 32),
+                      
+                      if (_isLoading) ...[
+                        const CircularProgressIndicator(color: Colors.orange),
+                        const SizedBox(height: 16),
+                        Text(_statusMessage, 
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(fontSize: 14),
                         ),
-                      ),
-                    ),
-                  ],
+                      ] else ...[
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton.icon(
+                            onPressed: _getUserLocationAndSearch,
+                            icon: const Icon(Icons.gps_fixed),
+                            label: const Text('Use My Current Location'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.orange,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                              textStyle: const TextStyle(fontSize: 16),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        TextButton.icon(
+                          onPressed: _showManualLocationPicker,
+                          icon: const Icon(Icons.edit_location, color: Colors.orange),
+                          label: const Text('Set Location Manually', style: TextStyle(color: Colors.orange)),
+                        ),
+                      ],
+                      
+                      if (_statusMessage.isNotEmpty && !_isLoading) ...[
+                        const SizedBox(height: 16),
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: Colors.red.shade50,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: Colors.red.shade200),
+                          ),
+                          child: Text(_statusMessage, 
+                            style: TextStyle(color: Colors.red.shade700),
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
+                      ]
+                    ],
+                  ),
                 ),
               ),
-            ]
-          ],
-        ),
-      ),
-    );
-  }
-
-  /// View shown AFTER a location is acquired.
-  Widget _buildSearchResultsView() {
-    return Column(
-      children: [
-        // Search bar and location info
-        Container(
-          color: Colors.grey.shade50,
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            children: [
-              // Search field
-              TextField(
-                controller: _searchController,
-                decoration: InputDecoration(
-                  hintText: 'Search for specific materials or stores...',
-                  prefixIcon: const Icon(Icons.search, color: Colors.orange),
-                  suffixIcon: IconButton(
-                    icon: const Icon(Icons.clear),
-                    onPressed: () {
-                      _searchController.clear();
-                      _searchNearbyStores();
-                    },
-                  ),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide.none,
-                  ),
-                  filled: true,
-                  fillColor: Colors.white,
-                ),
-                onSubmitted: (_) => _searchNearbyStores(),
-              ),
-              
-              const SizedBox(height: 12),
-              
-              // Status and action buttons
-              Row(
+            )
+          // If we DO have a location, show the search results view
+          else
+            Expanded(
+              child: Column(
                 children: [
-                  Expanded(
-                    child: Text(
-                      _statusMessage,
-                      style: TextStyle(
-                        color: Colors.grey.shade600,
-                        fontSize: 14,
+                  // Search Bar
+                  Container(
+                    padding: const EdgeInsets.all(16.0),
+                    child: TextField(
+                      controller: _searchController,
+                      decoration: InputDecoration(
+                        hintText: 'Search for specific stores or materials...',
+                        prefixIcon: const Icon(Icons.search),
+                        suffixIcon: IconButton(
+                          icon: const Icon(Icons.clear),
+                          onPressed: () {
+                            _searchController.clear();
+                            if (_currentPosition != null) {
+                              _searchNearbyStores();
+                            }
+                          },
+                        ),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        filled: true,
+                        fillColor: Colors.grey[100],
                       ),
+                      onSubmitted: (text) => _searchNearbyStores(),
                     ),
                   ),
-                  TextButton.icon(
-                    onPressed: _showManualLocationPicker,
-                    icon: const Icon(Icons.edit_location, size: 18),
-                    label: const Text('Change'),
-                    style: TextButton.styleFrom(foregroundColor: Colors.orange),
+                  
+                  // Status/Location Info
+                  if (_statusMessage.isNotEmpty)
+                    Container(
+                      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.orange.shade50,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.orange.shade200),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(Icons.info, color: Colors.orange.shade700, size: 16),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(_statusMessage, 
+                              style: TextStyle(color: Colors.orange.shade700, fontSize: 12),
+                            ),
+                          ),
+                          IconButton(
+                            onPressed: _showManualLocationPicker,
+                            icon: Icon(Icons.edit_location, size: 16, color: Colors.orange.shade700),
+                            tooltip: 'Change location',
+                          ),
+                        ],
+                      ),
+                    ),
+                  
+                  // Loading or Store List
+                  Expanded(
+                    child: _isLoading
+                        ? const Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                CircularProgressIndicator(color: Colors.orange),
+                                SizedBox(height: 16),
+                                Text('Loading stores...'),
+                              ],
+                            ),
+                          )
+                        : _stores.isEmpty
+                            ? Center(
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    const Icon(Icons.store, size: 64, color: Colors.grey),
+                                    const SizedBox(height: 16),
+                                    Text(_statusMessage.isNotEmpty ? _statusMessage : 'No stores found'),
+                                    const SizedBox(height: 16),
+                                    ElevatedButton(
+                                      onPressed: _searchNearbyStores,
+                                      child: const Text('Try Again'),
+                                    ),
+                                  ],
+                                ),
+                              )
+                            : ListView.builder(
+                                itemCount: _stores.length,
+                                padding: const EdgeInsets.all(16),
+                                itemBuilder: (context, index) {
+                                  final store = _stores[index];
+                                  return Card(
+                                    margin: const EdgeInsets.only(bottom: 12),
+                                    child: ListTile(
+                                      leading: CircleAvatar(
+                                        backgroundColor: Colors.orange,
+                                        child: Text(
+                                          store.name[0],
+                                          style: const TextStyle(color: Colors.white),
+                                        ),
+                                      ),
+                                      title: Text(store.name),
+                                      subtitle: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(store.address),
+                                          const SizedBox(height: 4),
+                                          Row(
+                                            children: [
+                                              Icon(Icons.star, size: 16, color: Colors.amber),
+                                              Text(' ${store.rating}'),
+                                              const SizedBox(width: 16),
+                                              Icon(Icons.location_on, size: 16, color: Colors.grey),
+                                              Text(' ${_formatDistance(store.distance)}'),
+                                              if (store.isOpen) ...[
+                                                const SizedBox(width: 16),
+                                                Container(
+                                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                                  decoration: BoxDecoration(
+                                                    color: Colors.green,
+                                                    borderRadius: BorderRadius.circular(4),
+                                                  ),
+                                                  child: const Text('Open', 
+                                                    style: TextStyle(color: Colors.white, fontSize: 10),
+                                                  ),
+                                                ),
+                                              ],
+                                            ],
+                                          ),
+                                        ],
+                                      ),
+                                      trailing: PopupMenuButton(
+                                        itemBuilder: (context) => [
+                                          PopupMenuItem(
+                                            child: const ListTile(
+                                              leading: Icon(Icons.directions),
+                                              title: Text('Directions'),
+                                            ),
+                                            onTap: () => _openGoogleMaps(store),
+                                          ),
+                                          if (store.phoneNumber != null)
+                                            PopupMenuItem(
+                                              child: const ListTile(
+                                                leading: Icon(Icons.phone),
+                                                title: Text('Call'),
+                                              ),
+                                              onTap: () => _callStore(store.phoneNumber),
+                                            ),
+                                        ],
+                                      ),
+                                    ),
+                                  );
+                                },
+                              ),
                   ),
                 ],
               ),
-            ],
-          ),
-        ),
-
-        // Results area
-        Expanded(
-          child: _isLoading
-            ? const Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    CircularProgressIndicator(color: Colors.orange),
-                    SizedBox(height: 16),
-                    Text('Searching for stores...'),
-                  ],
-                ),
-              )
-            : _stores.isEmpty
-              ? Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(32.0),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.store_outlined, size: 64, color: Colors.grey.shade400),
-                        const SizedBox(height: 16),
-                        const Text(
-                          'No stores found',
-                          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          'Try adjusting your search terms or location.',
-                          style: TextStyle(color: Colors.grey.shade600),
-                          textAlign: TextAlign.center,
-                        ),
-                      ],
-                    ),
-                  ),
-                )
-              : ListView.builder(
-                  padding: const EdgeInsets.all(16),
-                  itemCount: _stores.length,
-                  itemBuilder: (context, index) {
-                    final store = _stores[index];
-                    return Card(
-                      elevation: 2,
-                      margin: const EdgeInsets.only(bottom: 12),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                      child: Padding(
-                        padding: const EdgeInsets.all(16),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            // Store name and rating
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: Text(
-                                    store.name,
-                                    style: const TextStyle(
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ),
-                                if (store.rating > 0) ...[
-                                  Icon(Icons.star, color: Colors.amber.shade600, size: 20),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    store.rating.toStringAsFixed(1),
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      color: Colors.grey.shade700,
-                                    ),
-                                  ),
-                                ],
-                              ],
-                            ),
-                            
-                            const SizedBox(height: 8),
-                            
-                            // Address
-                            Row(
-                              children: [
-                                Icon(Icons.location_on, color: Colors.grey.shade600, size: 16),
-                                const SizedBox(width: 4),
-                                Expanded(
-                                  child: Text(
-                                    store.address,
-                                    style: TextStyle(color: Colors.grey.shade700),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            
-                            const SizedBox(height: 12),
-                            
-                            // Action buttons
-                            Row(
-                              children: [
-                                // Distance info
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                  decoration: BoxDecoration(
-                                    color: Colors.orange.shade50,
-                                    borderRadius: BorderRadius.circular(6),
-                                  ),
-                                  child: Text(
-                                    _formatDistance(store.distance),
-                                    style: TextStyle(
-                                      color: Colors.orange.shade700,
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ),
-                                
-                                // Open status
-                                Container(
-                                  margin: const EdgeInsets.only(left: 8),
-                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                  decoration: BoxDecoration(
-                                    color: store.isOpen ? Colors.green.shade50 : Colors.red.shade50,
-                                    borderRadius: BorderRadius.circular(6),
-                                  ),
-                                  child: Text(
-                                    store.isOpen ? 'Open' : 'Closed',
-                                    style: TextStyle(
-                                      color: store.isOpen ? Colors.green.shade700 : Colors.red.shade700,
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ),
-                                
-                                const Spacer(),
-                                
-                                // Action buttons
-                                if (store.phoneNumber != null && store.phoneNumber!.isNotEmpty)
-                                  IconButton(
-                                    onPressed: () => _callStore(store),
-                                    icon: const Icon(Icons.phone, color: Colors.green),
-                                    tooltip: 'Call store',
-                                  ),
-                                IconButton(
-                                  onPressed: () => _getDirections(store),
-                                  icon: const Icon(Icons.directions, color: Colors.blue),
-                                  tooltip: 'Get directions',
-                                ),
-                                IconButton(
-                                  onPressed: () => _viewStoreDetails(store),
-                                  icon: const Icon(Icons.info, color: Colors.deepPurple),
-                                  tooltip: 'View details',
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
-                    );
-                  },
-                ),
-        ),
-      ],
+            ),
+        ],
+      ),
     );
   }
 }
