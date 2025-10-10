@@ -36,6 +36,127 @@ GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "137371359979-uteh19od42d7hjal2
 # Google Maps API configuration
 GOOGLE_MAPS_API_KEY = os.getenv("GOOGLE_MAPS_API_KEY", "AIzaSyCzWcYKBQGWFY7uqSp15BN8OKNsaqVJlYY")
 
+# Construction Phase Checklist Templates
+CHECKLIST_TEMPLATES = {
+    "Residential": {
+        "Phase 1: Pre-Construction": [
+            "Site Analysis & Survey",
+            "Soil Testing",
+            "Building Plan Approval",
+            "Budget Finalization",
+            "Contractor Selection",
+            "Material Vendor Selection",
+            "Site Clearing & Preparation"
+        ],
+        "Phase 2: Foundation": [
+            "Earth Excavation",
+            "Anti-Termite Treatment",
+            "PCC (Plain Cement Concrete) Work",
+            "Footing Steel Work",
+            "Foundation Concrete Pouring",
+            "Foundation Waterproofing",
+            "Backfilling & Compaction"
+        ],
+        "Phase 3: Structural Work": [
+            "Column & Beam Steel Work",
+            "Column & Beam Formwork",
+            "Column & Beam Concrete Casting",
+            "Slab Steel Work",
+            "Slab Formwork",
+            "Slab Concrete Casting",
+            "Staircase Construction",
+            "Brickwork/Block Work - Ground Floor",
+            "Brickwork/Block Work - Upper Floors",
+            "Lintel Casting"
+        ],
+        "Phase 4: Services Installation": [
+            "Electrical Conduit Laying",
+            "Plumbing Pipeline Installation",
+            "Drainage Line Installation",
+            "HVAC Duct Installation",
+            "Bathroom Waterproofing"
+        ],
+        "Phase 5: Finishing": [
+            "Internal Wall Plastering",
+            "External Wall Plastering",
+            "Flooring Work",
+            "Wall Tiling",
+            "Door Frame Installation",
+            "Window Frame Installation",
+            "Painting - First Coat",
+            "Kitchen Counter Installation",
+            "Bathroom Fixtures Installation",
+            "Electrical Fixtures Installation",
+            "Painting - Final Coat"
+        ],
+        "Phase 6: External Works": [
+            "Compound Wall Construction",
+            "External Drainage",
+            "Landscaping",
+            "Driveway Construction",
+            "Gate Installation"
+        ]
+    },
+    "Commercial": {
+        "Phase 1: Pre-Construction": [
+            "Site Analysis & Feasibility Study",
+            "Environmental Impact Assessment",
+            "Building Plan & Zoning Approval",
+            "Budget & Finance Planning",
+            "Contractor & Vendor Selection",
+            "Site Mobilization",
+            "Safety Plan Implementation"
+        ],
+        "Phase 2: Foundation": [
+            "Site Clearing & Excavation",
+            "Soil Treatment",
+            "Foundation Marking",
+            "Foundation Steel Work",
+            "Foundation Concrete Pouring",
+            "Waterproofing Treatment",
+            "Underground Tank Construction"
+        ],
+        "Phase 3: Structural Work": [
+            "Column Construction",
+            "Beam Construction",
+            "Floor Slab Construction",
+            "Shear Wall Construction",
+            "Core Wall Construction",
+            "Post-tensioning Work",
+            "External Wall Construction",
+            "Internal Wall Construction"
+        ],
+        "Phase 4: Services Integration": [
+            "Electrical System Installation",
+            "HVAC System Installation",
+            "Plumbing System Installation",
+            "Fire Fighting System Installation",
+            "Elevator Installation",
+            "Building Management System Setup",
+            "Security System Installation"
+        ],
+        "Phase 5: Interior & Finishing": [
+            "Floor Finishing",
+            "Wall Finishing",
+            "Ceiling Work",
+            "Glass Facade Installation",
+            "Door & Window Installation",
+            "Painting Work",
+            "Signage Installation",
+            "Interior Fixtures Installation"
+        ],
+        "Phase 6: External Development": [
+            "Parking Area Development",
+            "Landscaping",
+            "External Lighting",
+            "Storm Water Drainage",
+            "Sewage Treatment Plant",
+            "Access Control Setup",
+            "Final Site Cleaning"
+        ]
+    }
+}
+
 # Product Category Mapping - Maps Google Places types to expected product categories
 PRODUCT_CATEGORY_MAP = {
     "hardware_store": [
@@ -201,6 +322,20 @@ def init_db():
             user_id TEXT DEFAULT 'anonymous',
             description TEXT DEFAULT '',
             status TEXT DEFAULT 'Planning' CHECK (status IN ('Planning', 'In Progress', 'Completed', 'On Hold'))
+        )
+    ''')
+    
+    # Create project_tasks table (for construction phase checklist)
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS project_tasks (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            project_id INTEGER NOT NULL,
+            phase TEXT NOT NULL,
+            task_name TEXT NOT NULL,
+            is_completed BOOLEAN DEFAULT FALSE,
+            created_at TEXT NOT NULL,
+            completed_at TEXT,
+            FOREIGN KEY (project_id) REFERENCES projects (id) ON DELETE CASCADE
         )
     ''')
     
@@ -701,7 +836,7 @@ async def get_store_details(place_id: str):
 @app.post("/api/v1/projects")
 async def create_project(project: ProjectCreate):
     """
-    Create a new construction project
+    Create a new construction project and its associated tasks from template
     """
     try:
         # Validate project type
@@ -728,14 +863,54 @@ async def create_project(project: ProjectCreate):
         ))
         
         project_id = cursor.lastrowid
+        
+        # Create tasks from template
+        template = CHECKLIST_TEMPLATES.get(project.project_type)
+        if template:
+            task_entries = []
+            for phase, tasks in template.items():
+                for task_name in tasks:
+                    task_entries.append((
+                        project_id,
+                        phase,
+                        task_name,
+                        False,  # is_completed
+                        created_at,  # created_at
+                        None  # completed_at
+                    ))
+            
+            # Bulk insert all tasks
+            cursor.executemany('''
+                INSERT INTO project_tasks (project_id, phase, task_name, is_completed, created_at, completed_at)
+                VALUES (?, ?, ?, ?, ?, ?)
+            ''', task_entries)
+        
         conn.commit()
+        
+        # Fetch all created tasks
+        cursor.execute('''
+            SELECT id, phase, task_name, is_completed
+            FROM project_tasks
+            WHERE project_id = ?
+            ORDER BY phase, id
+        ''', (project_id,))
+        tasks = [
+            {
+                "id": row[0],
+                "phase": row[1],
+                "task_name": row[2],
+                "is_completed": bool(row[3])
+            }
+            for row in cursor.fetchall()
+        ]
+        
         conn.close()
         
-        print(f"✅ Created new project: {project.name} (ID: {project_id})")
+        print(f"✅ Created new project: {project.name} (ID: {project_id}) with {len(tasks)} tasks")
         
         return {
             "success": True,
-            "message": "Project created successfully",
+            "message": "Project created successfully with checklist",
             "project_id": project_id,
             "project": {
                 "id": project_id,
@@ -746,7 +921,8 @@ async def create_project(project: ProjectCreate):
                 "created_at": created_at,
                 "description": project.description,
                 "status": "Planning"
-            }
+            },
+            "tasks": tasks
         }
         
     except Exception as e:
@@ -796,43 +972,137 @@ async def get_projects(user_id: str = "anonymous"):
         print(f"❌ Error getting projects: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to get projects: {str(e)}")
 
-@app.get("/api/v1/projects/{project_id}")
-async def get_project(project_id: int):
+@app.put("/api/v1/projects/{project_id}/tasks/{task_id}")
+async def update_task(project_id: int, task_id: int, is_completed: bool):
     """
-    Get a specific project by ID
+    Update the completion status of a specific task
     """
     try:
         conn = sqlite3.connect('store_prices.db')
         cursor = conn.cursor()
         
+        # First verify that the task belongs to the specified project
+        cursor.execute('''
+            SELECT id FROM project_tasks 
+            WHERE id = ? AND project_id = ?
+        ''', (task_id, project_id))
+        
+        if not cursor.fetchone():
+            conn.close()
+            raise HTTPException(status_code=404, detail="Task not found or does not belong to the specified project")
+        
+        # Update task status
+        completed_at = datetime.now().isoformat() if is_completed else None
+        cursor.execute('''
+            UPDATE project_tasks 
+            SET is_completed = ?, completed_at = ?
+            WHERE id = ? AND project_id = ?
+        ''', (is_completed, completed_at, task_id, project_id))
+        
+        # Get updated task details
+        cursor.execute('''
+            SELECT id, phase, task_name, is_completed, created_at, completed_at
+            FROM project_tasks
+            WHERE id = ?
+        ''', (task_id,))
+        task = cursor.fetchone()
+        
+        # Update project status based on task completion
+        cursor.execute('''
+            SELECT COUNT(*) as total, SUM(CASE WHEN is_completed THEN 1 ELSE 0 END) as completed
+            FROM project_tasks
+            WHERE project_id = ?
+        ''', (project_id,))
+        counts = cursor.fetchone()
+        total_tasks, completed_tasks = counts
+        
+        # Update project status if all tasks are complete
+        if completed_tasks == total_tasks and is_completed:
+            cursor.execute('''
+                UPDATE projects
+                SET status = 'Completed'
+                WHERE id = ?
+            ''', (project_id,))
+        elif completed_tasks > 0:
+            cursor.execute('''
+                UPDATE projects
+                SET status = 'In Progress'
+                WHERE id = ?
+            ''', (project_id,))
+        
+        conn.commit()
+        conn.close()
+        
+        return {
+            "success": True,
+            "task": {
+                "id": task[0],
+                "phase": task[1],
+                "task_name": task[2],
+                "is_completed": bool(task[3]),
+                "created_at": task[4],
+                "completed_at": task[5]
+            },
+            "project_progress": {
+                "total_tasks": total_tasks,
+                "completed_tasks": completed_tasks,
+                "completion_percentage": round((completed_tasks / total_tasks) * 100, 1)
+            }
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ Error updating task: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to update task: {str(e)}")
+
+@app.get("/api/v1/projects/{project_id}")
+async def get_project(project_id: int):
+    """
+    Get a specific project by ID, including its tasks
+    """
+    try:
+        conn = sqlite3.connect('store_prices.db')
+        conn.row_factory = sqlite3.Row  # Allows accessing columns by name
+        cursor = conn.cursor()
+        
+        # Get project details
         cursor.execute('''
             SELECT id, name, location, project_type, budget, created_at, user_id, description, status
             FROM projects
             WHERE id = ?
         ''', (project_id,))
         
-        row = cursor.fetchone()
-        conn.close()
+        project_row = cursor.fetchone()
         
-        if not row:
+        if not project_row:
+            conn.close()
             raise HTTPException(status_code=404, detail="Project not found")
         
-        project = {
-            "id": row[0],
-            "name": row[1],
-            "location": row[2],
-            "project_type": row[3],
-            "budget": row[4],
-            "created_at": row[5],
-            "user_id": row[6],
-            "description": row[7],
-            "status": row[8]
+        project = dict(project_row)
+        
+        # Get project tasks
+        cursor.execute('''
+            SELECT id, phase, task_name, is_completed, created_at, completed_at
+            FROM project_tasks
+            WHERE project_id = ?
+            ORDER BY phase, id
+        ''', (project_id,))
+        
+        tasks = [dict(row) for row in cursor.fetchall()]
+        
+        conn.close()
+        
+        # Combine project details with tasks
+        project_with_tasks = {
+            "project": project,
+            "tasks": tasks
         }
         
-        print(f"✅ Retrieved project: {project['name']}")
+        print(f"✅ Retrieved project '{project['name']}' with {len(tasks)} tasks")
         return {
             "success": True,
-            "project": project
+            "data": project_with_tasks
         }
         
     except HTTPException:
