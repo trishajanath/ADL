@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'concrete_prediction_service.dart';
 import 'scan_storage.dart';
+import 'chatbot_page.dart';
 
 class PredictionPage extends StatefulWidget {
   final String category; // "Residential" or "Commercial"
@@ -459,6 +460,18 @@ class _PredictionPageState extends State<PredictionPage> {
             },
             child: Text('New Prediction'),
           ),
+          ElevatedButton.icon(
+            onPressed: () {
+              Navigator.pop(context);
+              _openChatbot(result);
+            },
+            icon: Icon(Icons.smart_toy),
+            label: Text('Ask AI'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF1E3A8A),
+              foregroundColor: Colors.white,
+            ),
+          ),
           ElevatedButton(
             onPressed: () {
               Navigator.pop(context);
@@ -468,11 +481,7 @@ class _PredictionPageState extends State<PredictionPage> {
               backgroundColor: Colors.green,
               foregroundColor: Colors.white,
             ),
-            child: Text('Save Scan'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text('Done'),
+            child: Text('Save'),
           ),
         ],
       ),
@@ -685,6 +694,27 @@ class _PredictionPageState extends State<PredictionPage> {
             child: Text('OK'),
           ),
         ],
+      ),
+    );
+  }
+
+  void _openChatbot(Map<String, dynamic> result) {
+    // Create a formatted prediction context for the chatbot
+    String predictionContext = '''
+Concrete Prediction Results:
+- Grade: ${result['prediction']['concrete_grade']}
+- Confidence: ${result['prediction']['confidence_percentage']}
+- Estimated Cost: ${result['cost_estimation']['total_estimated_cost']}
+- Volume Required: ${result['cost_estimation']['estimated_volume_cum']}
+- Materials: Cement ${result['materials']['Cement_kg']}kg, Water ${result['materials']['Water_kg']}kg, Sand ${result['materials']['Sand_kg']}kg, Coarse Aggregate ${result['materials']['CA20_kg']}kg
+- Building Type: ${widget.category}
+- Project Details: ${_formData.toString()}
+''';
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => ChatbotPage(predictionContext: predictionContext),
       ),
     );
   }
