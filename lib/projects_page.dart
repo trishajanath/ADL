@@ -740,10 +740,39 @@ class _ProjectsPageState extends State<ProjectsPage> {
       // Extract budget from estimated cost
       double budget = 0.0;
       try {
-        final costStr = scan.estimatedCost.replaceAll(RegExp(r'[^\d.]'), '');
-        budget = double.tryParse(costStr) ?? 0.0;
+        print('🔍 Scan cost string: ${scan.estimatedCost}');
+        
+        // Remove currency symbols, letters (L, Cr, K), and commas, but keep numbers and decimal point
+        String costStr = scan.estimatedCost
+            .replaceAll('₹', '')
+            .replaceAll(',', '')
+            .replaceAll(RegExp(r'[LCrKk]'), '')
+            .trim();
+        
+        print('💰 Cleaned cost string: $costStr');
+        
+        double parsedAmount = double.tryParse(costStr) ?? 0.0;
+        
+        // If the cost was in lakhs (L), multiply by 100,000
+        if (scan.estimatedCost.toUpperCase().contains('L') && !scan.estimatedCost.toUpperCase().contains('CR')) {
+          budget = parsedAmount * 100000;
+        }
+        // If in crores (Cr), multiply by 10,000,000
+        else if (scan.estimatedCost.toUpperCase().contains('CR')) {
+          budget = parsedAmount * 10000000;
+        }
+        // If in thousands (K), multiply by 1,000
+        else if (scan.estimatedCost.toUpperCase().contains('K')) {
+          budget = parsedAmount * 1000;
+        }
+        // Otherwise use as-is
+        else {
+          budget = parsedAmount;
+        }
+        
+        print('✅ Final budget: ₹$budget');
       } catch (e) {
-        print('Could not parse budget from cost: $e');
+        print('❌ Could not parse budget from cost: $e');
       }
 
       await ProjectsService.createProject(

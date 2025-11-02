@@ -234,4 +234,32 @@ class ProjectsService {
       throw Exception('Failed to add expense: ${response.statusCode}');
     }
   }
+
+  /// Delete a project
+  static Future<bool> deleteProject(int projectId, String userId) async {
+    try {
+      print('🗑️ Deleting project $projectId for user $userId');
+      
+      final response = await http.delete(
+        Uri.parse('$_baseUrl/api/v1/projects/$projectId?user_id=$userId'),
+      );
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        if (data['success'] == true) {
+          print('✅ Project deleted successfully');
+          return true;
+        } else {
+          print('❌ Delete failed: ${data['message']}');
+          return false;
+        }
+      } else {
+        print('❌ Failed to delete project: ${response.statusCode}');
+        return false;
+      }
+    } catch (e) {
+      print('❌ Error deleting project: $e');
+      return false;
+    }
+  }
 }

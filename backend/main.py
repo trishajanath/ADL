@@ -299,7 +299,8 @@ def init_db():
             password_hash TEXT,
             created_at TEXT NOT NULL,
             last_login TEXT,
-            auth_provider TEXT DEFAULT 'email'
+            auth_provider TEXT DEFAULT 'email',
+            profile_picture TEXT
         )
     ''')
     
@@ -495,7 +496,7 @@ async def login_user(user_data: dict):
         cursor = conn.cursor()
         
         # Get user by email
-        cursor.execute('SELECT email, name, password_hash, auth_provider FROM users WHERE email = ?', (email,))
+        cursor.execute('SELECT email, name, password_hash, auth_provider, profile_picture FROM users WHERE email = ?', (email,))
         user = cursor.fetchone()
         
         if not user:
@@ -506,7 +507,7 @@ async def login_user(user_data: dict):
                 "message": "Email not found. Please sign up first."
             }
         
-        user_email, user_name, password_hash, auth_provider = user
+        user_email, user_name, password_hash, auth_provider, profile_picture = user
         
         # If user registered with Google, they can't login with password
         if auth_provider == 'google' and password:
@@ -549,7 +550,8 @@ async def login_user(user_data: dict):
             "user": {
                 "email": user_email,
                 "name": user_name,
-                "auth_provider": auth_provider
+                "auth_provider": auth_provider,
+                "profile_picture": profile_picture
             }
         }
         
@@ -558,6 +560,51 @@ async def login_user(user_data: dict):
     except Exception as e:
         print(f"❌ Error during login: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to login: {str(e)}")
+
+@app.put("/api/v1/users/profile-picture")
+async def update_profile_picture(data: dict):
+    """
+    Update user's profile picture URL
+    """
+    try:
+        email = data.get('email')
+        profile_picture = data.get('profile_picture')
+        
+        if not email or not profile_picture:
+            raise HTTPException(status_code=400, detail="Email and profile_picture are required")
+        
+        conn = sqlite3.connect('store_prices.db')
+        cursor = conn.cursor()
+        
+        # Check if user exists
+        cursor.execute('SELECT id FROM users WHERE email = ?', (email,))
+        user = cursor.fetchone()
+        
+        if not user:
+            conn.close()
+            raise HTTPException(status_code=404, detail="User not found")
+        
+        # Update profile picture
+        cursor.execute('''
+            UPDATE users SET profile_picture = ? WHERE email = ?
+        ''', (profile_picture, email))
+        
+        conn.commit()
+        conn.close()
+        
+        print(f"✅ Profile picture updated for user: {email}")
+        
+        return {
+            "success": True,
+            "message": "Profile picture updated successfully",
+            "profile_picture": profile_picture
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ Error updating profile picture: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to update profile picture: {str(e)}")
 
 @app.post("/api/v1/debug/request")
 async def debug_request(request: Request):
@@ -1337,6 +1384,53 @@ async def get_project(project_id: int):
     except Exception as e:
         print(f"❌ Error getting project: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to get project: {str(e)}")
+
+@app.delete("/api/v1/projects/{project_id}")
+async def delete_project(project_id: int, user_id: str):
+    """
+    Delete a project and all its associated tasks and expenses
+    User must own the project to delete it
+    """
+    try:
+        conn = sqlite3.connect('store_prices.db')
+        cursor = conn.cursor()
+
+        # Check if project exists and belongs to the user
+        cursor.execute('''
+            SELECT id, name, user_id FROM projects 
+            WHERE id = ?
+        ''', (project_id,))
+        
+        project = cursor.fetchone()
+        if not project:
+            conn.close()
+            raise HTTPException(status_code=404, detail="Project not found")
+        
+        # Verify ownership
+        if project[2] != user_id:
+            conn.close()
+            raise HTTPException(status_code=403, detail="You don't have permission to delete this project")
+        
+        project_name = project[1]
+        
+        # Delete project (CASCADE will delete tasks and expenses automatically)
+        cursor.execute('DELETE FROM projects WHERE id = ?', (project_id,))
+        
+        conn.commit()
+        conn.close()
+        
+        print(f"✅ Deleted project {project_id}: {project_name}")
+        
+        return {
+            "success": True,
+            "message": f"Project '{project_name}' deleted successfully"
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ Error deleting project: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to delete project: {str(e)}")
 
 @app.post("/api/v1/projects/{project_id}/expenses")
 async def add_expense_to_project(project_id: int, expense: ExpenseCreate):

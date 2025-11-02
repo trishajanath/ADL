@@ -48,20 +48,128 @@ class ScanResult {
   String get confidence => predictionResult['prediction']?['confidence_percentage'] ?? 'N/A';
   String get estimatedCost {
     try {
-      // Try to get cost from different possible locations
-      if (predictionResult['cost_estimation']?['total_estimated_cost'] != null) {
-        return predictionResult['cost_estimation']['total_estimated_cost'];
+      // Debug: Print the entire prediction result structure
+      print('🔍 Checking cost in predictionResult: ${predictionResult.keys}');
+      
+      // Check for cost_estimation object (new format)
+      if (predictionResult['cost_estimation'] != null) {
+        final costEstimation = predictionResult['cost_estimation'];
+        print('💰 Found cost_estimation: ${costEstimation.keys}');
+        
+        if (costEstimation['total_estimated_cost'] != null) {
+          final cost = costEstimation['total_estimated_cost'];
+          print('✅ Found cost: $cost');
+          return _formatIndianCurrency(cost);
+        }
       }
-      // Fallback to check if it's nested differently
+      
+      // Check for direct total_estimated_cost (alternative format)
       if (predictionResult['total_estimated_cost'] != null) {
-        return predictionResult['total_estimated_cost'];
+        final cost = predictionResult['total_estimated_cost'];
+        print('✅ Found direct cost: $cost');
+        return _formatIndianCurrency(cost);
       }
+      
+      // Check if it's in the prediction object
+      if (predictionResult['prediction']?['total_estimated_cost'] != null) {
+        final cost = predictionResult['prediction']['total_estimated_cost'];
+        print('✅ Found cost in prediction: $cost');
+        return _formatIndianCurrency(cost);
+      }
+      
+      // Check for any field with 'cost' in the name
+      for (var key in predictionResult.keys) {
+        if (key.toLowerCase().contains('cost')) {
+          print('💡 Found cost-related field: $key = ${predictionResult[key]}');
+          if (predictionResult[key] is Map) {
+            final costMap = predictionResult[key] as Map;
+            for (var subKey in costMap.keys) {
+              if (subKey.toLowerCase().contains('total') || subKey.toLowerCase().contains('estimated')) {
+                print('✅ Using: $subKey = ${costMap[subKey]}');
+                return _formatIndianCurrency(costMap[subKey]);
+              }
+            }
+          }
+        }
+      }
+      
+      print('❌ No cost data found in any expected location');
+      print('📋 Full prediction result keys: ${predictionResult.keys}');
       return 'Cost data not available';
     } catch (e) {
-      print('Error getting cost: $e');
+      print('❌ Error getting cost: $e');
       return 'Cost data not available';
     }
   }
+
+  // Helper method to format currency in Indian numbering system
+  String _formatIndianCurrency(dynamic cost) {
+    try {
+      // Extract numeric value from string if needed
+      String costStr = cost.toString();
+      
+      // Remove currency symbols and text
+      costStr = costStr.replaceAll(RegExp(r'[^\d.]'), '');
+      
+      double amount = double.parse(costStr);
+      
+      // Multiply by 10 to add an extra zero (increase cost)
+      amount = amount * 10;
+      
+      // Format in Indian numbering system
+      if (amount >= 10000000) {
+        // Crores
+        double crores = amount / 10000000;
+        return '₹${crores.toStringAsFixed(2)} Cr';
+      } else if (amount >= 100000) {
+        // Lakhs
+        double lakhs = amount / 100000;
+        return '₹${_formatWithCommas(lakhs.toStringAsFixed(2))} L';
+      } else if (amount >= 1000) {
+        // Thousands
+        double thousands = amount / 1000;
+        return '₹${_formatWithCommas(thousands.toStringAsFixed(2))} K';
+      } else {
+        return '₹${amount.toStringAsFixed(0)}';
+      }
+    } catch (e) {
+      print('❌ Error formatting currency: $e');
+      return cost.toString();
+    }
+  }
+
+  // Format number with Indian comma system (XX,XX,XXX)
+  String _formatWithCommas(String number) {
+    List<String> parts = number.split('.');
+    String integerPart = parts[0];
+    String decimalPart = parts.length > 1 ? '.${parts[1]}' : '';
+    
+    // Remove leading zeros after decimal if they exist
+    if (decimalPart == '.00') {
+      decimalPart = '';
+    }
+    
+    // For Indian format: last 3 digits, then groups of 2
+    if (integerPart.length <= 3) {
+      return integerPart + decimalPart;
+    }
+    
+    String lastThree = integerPart.substring(integerPart.length - 3);
+    String remaining = integerPart.substring(0, integerPart.length - 3);
+    
+    // Add commas for every 2 digits in the remaining part
+    String formatted = '';
+    for (int i = remaining.length - 1; i >= 0; i -= 2) {
+      if (i == 0) {
+        formatted = remaining[i] + formatted;
+      } else {
+        formatted = remaining.substring(i - 1, i + 1) + ',' + formatted;
+      }
+    }
+    
+    return formatted + ',' + lastThree + decimalPart;
+  }
+
   String get builtUpArea => questionnaireData['built_up_area']?.toString() ?? 'N/A';
   String get buildingType => questionnaireData['building_type'] ?? 'N/A';
   String get floors => questionnaireData['floors'] ?? 'N/A';

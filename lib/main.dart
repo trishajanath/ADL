@@ -878,7 +878,8 @@ class _LoginSignUpPageState extends State<LoginSignUpPage>
       if (result != null && result['success'] == true) {
         // Login successful
         final userName = result['user']['name'];
-        AuthService().mockSignIn(userName, email);
+        final profilePicture = result['user']['profile_picture'];
+        AuthService().mockSignIn(userName, email, profilePicture: profilePicture);
         
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(

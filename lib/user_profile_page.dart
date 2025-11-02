@@ -2,6 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
+import 'dart:convert';
 import './auth_service.dart';
 import './edit_profile_page.dart';
 import './change_password_page.dart';
@@ -47,13 +48,21 @@ class _UserProfilePageState extends State<UserProfilePage> {
       return NetworkImage('https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?ixlib=rb-4.0.3&auto=format&fit=crop&w=150&q=80');
     }
     
-    // Check if it's a network URL or a local file path
+    // Check if it's a base64 encoded image
+    if (photoUrl.startsWith('data:image')) {
+      // Extract base64 data and decode
+      final base64Data = photoUrl.split(',')[1];
+      final bytes = base64Decode(base64Data);
+      return MemoryImage(bytes);
+    }
+    
+    // Check if it's a network URL
     if (photoUrl.startsWith('http://') || photoUrl.startsWith('https://')) {
       return NetworkImage(photoUrl);
-    } else {
-      // It's a local file path
-      return FileImage(File(photoUrl));
     }
+    
+    // Fallback to file path (shouldn't happen with new system)
+    return FileImage(File(photoUrl));
   }
 
   @override
@@ -627,28 +636,32 @@ class _UserProfilePageState extends State<UserProfilePage> {
       );
 
       if (image != null) {
-        // In a real app, you would upload this to a server and get a URL
-        // For now, we'll use a local file path which can be displayed using FileImage
-        final String imagePath = image.path;
+        // Convert image to base64 for storage
+        final bytes = await image.readAsBytes();
+        final base64Image = 'data:image/jpeg;base64,${base64Encode(bytes)}';
         
-        // Update the profile picture in the auth service
-        AuthService().updateProfilePicture(imagePath);
+        // Update the profile picture in the auth service (saves to backend)
+        bool success = await AuthService().updateProfilePicture(base64Image);
         
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Row(
-              children: [
-                Icon(Icons.check_circle, color: Colors.white),
-                SizedBox(width: 8),
-                Text('Profile picture updated successfully!'),
-              ],
+        if (success) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Row(
+                children: [
+                  Icon(Icons.check_circle, color: Colors.white),
+                  SizedBox(width: 8),
+                  Text('Profile picture updated successfully!'),
+                ],
+              ),
+              backgroundColor: Colors.green,
+              behavior: SnackBarBehavior.floating,
             ),
-            backgroundColor: Colors.green,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
-        
-        setState(() {}); // Refresh UI
+          );
+          
+          setState(() {}); // Refresh UI
+        } else {
+          throw Exception('Failed to save profile picture');
+        }
       }
     } catch (e) {
       print('❌ Error picking image: $e');
@@ -668,23 +681,25 @@ class _UserProfilePageState extends State<UserProfilePage> {
     }
   }
 
-  void _removeProfilePicture() {
-    AuthService().updateProfilePicture('https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?ixlib=rb-4.0.3&auto=format&fit=crop&w=150&q=80');
+  Future<void> _removeProfilePicture() async {
+    bool success = await AuthService().updateProfilePicture('https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?ixlib=rb-4.0.3&auto=format&fit=crop&w=150&q=80');
     
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Row(
-          children: [
-            Icon(Icons.check_circle, color: Colors.white),
-            SizedBox(width: 8),
-            Text('Profile picture removed'),
-          ],
+    if (success) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              Icon(Icons.check_circle, color: Colors.white),
+              SizedBox(width: 8),
+              Text('Profile picture removed'),
+            ],
+          ),
+          backgroundColor: Colors.green,
+          behavior: SnackBarBehavior.floating,
         ),
-        backgroundColor: Colors.green,
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
-    
-    setState(() {}); // Refresh UI
+      );
+      
+      setState(() {}); // Refresh UI
+    }
   }
 }
