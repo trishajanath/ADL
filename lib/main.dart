@@ -11,6 +11,7 @@ import './user_profile_page.dart';
 import 'prediction_page.dart';
 import 'shop_search_page.dart';
 import 'projects_page.dart';
+import 'dashboard_page.dart';
 
 void main() {
   runApp(const MyApp());
@@ -58,19 +59,21 @@ class MyApp extends StatelessWidget {
 // --- CORE NAVIGATION WIDGET (REFACTORED) ---
 // This widget now controls the main view and the bottom navigation bar.
 class MainScreen extends StatefulWidget {
-  const MainScreen({super.key});
+  final int initialIndex;
+  
+  const MainScreen({super.key, this.initialIndex = 0});
 
   @override
   State<MainScreen> createState() => _MainScreenState();
 }
 
 class _MainScreenState extends State<MainScreen> {
-  int _currentIndex = 0;
+  late int _currentIndex;
   bool _hasSelectedCategory = false; // Track if user has selected residential/commercial
 
   // List of the main pages accessible from the bottom navigation bar.
   List<Widget> get _screens => [
-    HomePage(onCategorySelected: _onCategorySelected),
+    _hasSelectedCategory ? const DashboardPage() : HomePage(onCategorySelected: _onCategorySelected),
     const ShopSearchPage(),
     const QuestionnairePage(),
     const ProjectsPage(),
@@ -87,6 +90,7 @@ class _MainScreenState extends State<MainScreen> {
   @override
   void initState() {
     super.initState();
+    _currentIndex = widget.initialIndex;
     // Check if category was already selected
     _hasSelectedCategory = NavigationState.hasSelectedCategory;
   }
@@ -186,9 +190,12 @@ class _NavigationWrapperState extends State<NavigationWrapper> {
         Widget destinationPage;
         switch (index) {
           case 0:
-            destinationPage = HomePage(onCategorySelected: (category) {
-              NavigationState.setCategory(category);
-            });
+            // If category selected, show dashboard, otherwise show selection page
+            destinationPage = NavigationState.hasSelectedCategory 
+                ? const DashboardPage() 
+                : HomePage(onCategorySelected: (category) {
+                    NavigationState.setCategory(category);
+                  });
             break;
           case 1:
             destinationPage = const ShopSearchPage();
@@ -203,9 +210,11 @@ class _NavigationWrapperState extends State<NavigationWrapper> {
             destinationPage = const ProfilePage();
             break;
           default:
-            destinationPage = HomePage(onCategorySelected: (category) {
-              NavigationState.setCategory(category);
-            });
+            destinationPage = NavigationState.hasSelectedCategory 
+                ? const DashboardPage() 
+                : HomePage(onCategorySelected: (category) {
+                    NavigationState.setCategory(category);
+                  });
         }
         
         Navigator.of(context).pushReplacement(
@@ -299,15 +308,12 @@ class _HomePageState extends State<HomePage> {
     // Call the callback to enable bottom navigation
     widget.onCategorySelected?.call('residential');
     
-    Navigator.of(context).push(
+    // Navigate to dashboard
+    Navigator.of(context).pushReplacement(
       MaterialPageRoute(
         builder: (context) => const NavigationWrapper(
-          child: PremierConstructionPage(
-            title: 'Residential Construction',
-            tagline:
-                'Building dream homes with exceptional craftsmanship and attention to detail since 1999.',
-            type: 'residential',
-          ),
+          child: DashboardPage(),
+          currentIndex: 0,
         ),
       ),
     );
@@ -318,15 +324,12 @@ class _HomePageState extends State<HomePage> {
     // Call the callback to enable bottom navigation
     widget.onCategorySelected?.call('commercial');
     
-    Navigator.of(context).push(
+    // Navigate to dashboard
+    Navigator.of(context).pushReplacement(
       MaterialPageRoute(
         builder: (context) => const NavigationWrapper(
-          child: PremierConstructionPage(
-            title: 'Commercial Construction',
-            tagline:
-                'Delivering exceptional commercial projects with precision and innovation since 1999.',
-            type: 'commercial',
-          ),
+          child: DashboardPage(),
+          currentIndex: 0,
         ),
       ),
     );
