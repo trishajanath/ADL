@@ -58,7 +58,7 @@ class _AddExpenseFormState extends State<AddExpenseForm> {
               controller: _amountController,
               decoration: const InputDecoration(
                 labelText: 'Amount',
-                prefixText: '\$',
+                prefixText: '₹',
                 border: OutlineInputBorder(),
               ),
               keyboardType: const TextInputType.numberWithOptions(decimal: true),

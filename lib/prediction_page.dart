@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'concrete_prediction_service.dart';
 import 'scan_storage.dart';
 import 'chatbot_page.dart';
+import 'auth_service.dart';
 
 class PredictionPage extends StatefulWidget {
   final String category; // "Residential" or "Commercial"
@@ -30,7 +31,7 @@ class _PredictionPageState extends State<PredictionPage> {
       'id': 'building_type',
       'title': 'What type of residential building are you constructing?',
       'type': 'dropdown',
-      'options': ['Independent house', 'Duplex', 'Villa', 'Apartment (small-scale)'],
+      'options': ['Independent house', 'Apartment (small-scale)'],
       'required': true,
     },
     {
@@ -52,13 +53,6 @@ class _PredictionPageState extends State<PredictionPage> {
       'title': 'How many rooms do you plan?',
       'type': 'number',
       'placeholder': 'Enter approximate count',
-      'required': true,
-    },
-    {
-      'id': 'location',
-      'title': 'Where is your site located?',
-      'type': 'text',
-      'placeholder': 'Enter pincode or GPS location',
       'required': true,
     },
     {
@@ -438,7 +432,6 @@ class _PredictionPageState extends State<PredictionPage> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               _buildResultItem('Concrete Grade', result['prediction']['concrete_grade'], Icons.foundation),
-              _buildResultItem('Confidence', result['prediction']['confidence_percentage'], Icons.verified),
               _buildResultItem('Estimated Cost', result['cost_estimation']['total_estimated_cost'], Icons.attach_money),
               _buildResultItem('Volume Required', result['cost_estimation']['estimated_volume_cum'], Icons.view_in_ar),
               
@@ -491,62 +484,100 @@ class _PredictionPageState extends State<PredictionPage> {
   void _showSaveDialog(Map<String, dynamic> result) {
     String projectName = widget.existingScan?.projectName ?? _generateDefaultProjectName();
     final TextEditingController nameController = TextEditingController(text: projectName);
+    String? errorText;
     
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Row(
-          children: [
-            Icon(widget.existingScan != null ? Icons.edit : Icons.save, color: Colors.blue),
-            SizedBox(width: 8),
-            Text(widget.existingScan != null ? 'Update Scan' : 'Save Scan'),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(widget.existingScan != null 
-              ? 'Update your scan name:' 
-              : 'Give your scan a name for easy reference:'
-            ),
-            SizedBox(height: 16),
-            TextField(
-              controller: nameController,
-              decoration: InputDecoration(
-                labelText: 'Project Name',
-                hintText: 'e.g., My Dream House, Office Building',
-                border: OutlineInputBorder(),
-                prefixIcon: Icon(Icons.business),
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) => AlertDialog(
+          title: Row(
+            children: [
+              Icon(widget.existingScan != null ? Icons.edit : Icons.save, color: Colors.blue),
+              SizedBox(width: 8),
+              Text(widget.existingScan != null ? 'Update Scan' : 'Save Scan'),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(widget.existingScan != null 
+                ? 'Update your scan name:' 
+                : 'Give your scan a name for easy reference:'
               ),
-              maxLength: 50,
+              SizedBox(height: 16),
+              TextField(
+                controller: nameController,
+                decoration: InputDecoration(
+                  labelText: 'Project Name',
+                  hintText: 'e.g., My Dream House, Office Building',
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.business),
+                  errorText: errorText,
+                ),
+                maxLength: 50,
+                onChanged: (value) {
+                  // Clear error when user types
+                  if (errorText != null) {
+                    setState(() {
+                      errorText = null;
+                    });
+                  }
+                },
+              ),
+              SizedBox(height: 8),
+              Text(
+                widget.existingScan != null
+                  ? 'Your updated scan will be saved with the new analysis.'
+                  : 'You can view and edit this scan later from the home page.',
+                style: TextStyle(color: Colors.grey[600], fontSize: 12),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: Text('Skip'),
             ),
-            SizedBox(height: 8),
-            Text(
-              widget.existingScan != null
-                ? 'Your updated scan will be saved with the new analysis.'
-                : 'You can view and edit this scan later from the home page.',
-              style: TextStyle(color: Colors.grey[600], fontSize: 12),
+            ElevatedButton(
+              onPressed: () async {
+                final trimmedName = nameController.text.trim();
+                
+                // Validate empty name
+                if (trimmedName.isEmpty) {
+                  setState(() {
+                    errorText = 'Please enter a project name';
+                  });
+                  return;
+                }
+                
+                // Check for duplicate name
+                final userEmail = AuthService().userIdentifier;
+                final isDuplicate = await ScanStorage.scanNameExists(
+                  trimmedName, 
+                  userEmail,
+                  excludeScanId: widget.existingScan?.id,
+                );
+                
+                if (isDuplicate) {
+                  setState(() {
+                    errorText = 'A scan with this name already exists';
+                  });
+                  return;
+                }
+                
+                // If validation passes, save and close
+                Navigator.pop(context);
+                await _saveScanResult(trimmedName, result);
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.green,
+                foregroundColor: Colors.white,
+              ),
+              child: Text('Save'),
             ),
           ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text('Skip'),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              Navigator.pop(context);
-              await _saveScanResult(nameController.text.trim(), result);
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.green,
-              foregroundColor: Colors.white,
-            ),
-            child: Text('Save'),
-          ),
-        ],
       ),
     );
   }
@@ -582,7 +613,9 @@ class _PredictionPageState extends State<PredictionPage> {
           predictionResult: result,
           projectName: projectName,
         );
-        await ScanStorage.updateScan(scan);
+        // Get current user email as identifier
+        final userEmail = AuthService().userIdentifier;
+        await ScanStorage.updateScan(scan, userEmail);
       } else {
         // Create new scan
         scan = ScanResult(
@@ -593,7 +626,9 @@ class _PredictionPageState extends State<PredictionPage> {
           predictionResult: result,
           projectName: projectName,
         );
-        await ScanStorage.saveScan(scan);
+        // Get current user email as identifier
+        final userEmail = AuthService().userIdentifier;
+        await ScanStorage.saveScan(scan, userEmail);
       }
 
       // Show success message
@@ -703,7 +738,6 @@ class _PredictionPageState extends State<PredictionPage> {
     String predictionContext = '''
 Concrete Prediction Results:
 - Grade: ${result['prediction']['concrete_grade']}
-- Confidence: ${result['prediction']['confidence_percentage']}
 - Estimated Cost: ${result['cost_estimation']['total_estimated_cost']}
 - Volume Required: ${result['cost_estimation']['estimated_volume_cum']}
 - Materials: Cement ${result['materials']['Cement_kg']}kg, Water ${result['materials']['Water_kg']}kg, Sand ${result['materials']['Sand_kg']}kg, Coarse Aggregate ${result['materials']['CA20_kg']}kg

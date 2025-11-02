@@ -4,6 +4,7 @@ import 'models/project.dart' show Project;
 import 'widgets/project_card.dart';
 import 'projects_service.dart';
 import 'project_details_page.dart';
+import 'auth_service.dart';
 
 class ProjectsPage extends StatefulWidget {
   const ProjectsPage({super.key});
@@ -15,6 +16,7 @@ class ProjectsPage extends StatefulWidget {
 class _ProjectsPageState extends State<ProjectsPage> {
   List<Project> _projects = [];
   bool _isLoading = false;
+  final AuthService _authService = AuthService();
 
   @override
   void initState() {
@@ -26,11 +28,20 @@ class _ProjectsPageState extends State<ProjectsPage> {
     setState(() => _isLoading = true);
     
     try {
-      final projects = await ProjectsService.getProjects();
+      // Get current user email as identifier, default to 'anonymous' if not logged in
+      final userEmail = _authService.userIdentifier;
+      print('👤 Current user email: $userEmail');
+      print('👤 Is logged in: ${_authService.isLoggedIn}');
+      
+      // Fetch projects for the current user only (by email)
+      final projects = await ProjectsService.getProjects(userEmail);
+      
       setState(() {
         _projects = projects;
         _isLoading = false;
       });
+      
+      print('📊 Loaded ${projects.length} projects for user $userEmail');
     } catch (e) {
       setState(() => _isLoading = false);
       _showErrorMessage('Failed to load projects: $e');
@@ -176,6 +187,36 @@ class _ProjectsPageState extends State<ProjectsPage> {
               ),
               textAlign: TextAlign.center,
             ),
+            
+            // Show login hint if not logged in
+            if (!_authService.isLoggedIn) ...[
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                decoration: BoxDecoration(
+                  color: Colors.blue.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.blue.withOpacity(0.3)),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.info_outline, color: Colors.blue[700], size: 20),
+                    const SizedBox(width: 8),
+                    Flexible(
+                      child: Text(
+                        'Sign in to sync your projects across devices',
+                        style: TextStyle(
+                          color: Colors.blue[700],
+                          fontSize: 13,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
             
             const SizedBox(height: 32),
             
@@ -517,12 +558,18 @@ class _ProjectsPageState extends State<ProjectsPage> {
                 setState(() => isCreating = true);
 
                 try {
+                  // Get current user email as identifier
+                  final userEmail = _authService.userIdentifier;
+                  
+                  print('🏗️ Creating project for user email: $userEmail');
+                  
                   await ProjectsService.createProject(
                     name: nameController.text.trim(),
                     location: locationController.text.trim(),
                     projectType: selectedType,
                     budget: budget,
                     description: descriptionController.text.trim(),
+                    userId: userEmail,
                   );
 
                   Navigator.of(context).pop();

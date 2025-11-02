@@ -53,13 +53,19 @@ class ScanResult {
 }
 
 class ScanStorage {
-  static const String _scansKey = 'questionnaire_scans';
+  static const String _scansKeyPrefix = 'questionnaire_scans_';
+  
+  // Get user-specific key
+  static String _getUserScansKey(String userId) {
+    return '$_scansKeyPrefix$userId';
+  }
 
-  // Save a new scan result
-  static Future<void> saveScan(ScanResult scan) async {
+  // Save a new scan result for a specific user
+  static Future<void> saveScan(ScanResult scan, String userId) async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      List<String> existingScans = prefs.getStringList(_scansKey) ?? [];
+      final userKey = _getUserScansKey(userId);
+      List<String> existingScans = prefs.getStringList(userKey) ?? [];
       
       // Add new scan to the beginning of the list (most recent first)
       existingScans.insert(0, jsonEncode(scan.toJson()));
@@ -69,24 +75,25 @@ class ScanStorage {
         existingScans = existingScans.take(20).toList();
       }
       
-      await prefs.setStringList(_scansKey, existingScans);
-      print('✅ Scan saved successfully: ${scan.projectName}');
+      await prefs.setStringList(userKey, existingScans);
+      print('✅ Scan saved successfully for user $userId: ${scan.projectName}');
     } catch (e) {
       print('❌ Error saving scan: $e');
     }
   }
 
-  // Load all saved scans
-  static Future<List<ScanResult>> loadScans() async {
+  // Load all saved scans for a specific user
+  static Future<List<ScanResult>> loadScans(String userId) async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      List<String> scanStrings = prefs.getStringList(_scansKey) ?? [];
+      final userKey = _getUserScansKey(userId);
+      List<String> scanStrings = prefs.getStringList(userKey) ?? [];
       
       List<ScanResult> scans = scanStrings.map((scanString) {
         return ScanResult.fromJson(jsonDecode(scanString));
       }).toList();
       
-      print('📂 Loaded ${scans.length} saved scans');
+      print('📂 Loaded ${scans.length} saved scans for user $userId');
       return scans;
     } catch (e) {
       print('❌ Error loading scans: $e');
@@ -94,29 +101,31 @@ class ScanStorage {
     }
   }
 
-  // Delete a specific scan
-  static Future<void> deleteScan(String scanId) async {
+  // Delete a specific scan for a user
+  static Future<void> deleteScan(String scanId, String userId) async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      List<String> existingScans = prefs.getStringList(_scansKey) ?? [];
+      final userKey = _getUserScansKey(userId);
+      List<String> existingScans = prefs.getStringList(userKey) ?? [];
       
       existingScans.removeWhere((scanString) {
         final scan = ScanResult.fromJson(jsonDecode(scanString));
         return scan.id == scanId;
       });
       
-      await prefs.setStringList(_scansKey, existingScans);
-      print('🗑️ Scan deleted successfully: $scanId');
+      await prefs.setStringList(userKey, existingScans);
+      print('🗑️ Scan deleted successfully for user $userId: $scanId');
     } catch (e) {
       print('❌ Error deleting scan: $e');
     }
   }
 
-  // Update an existing scan
-  static Future<void> updateScan(ScanResult updatedScan) async {
+  // Update an existing scan for a user
+  static Future<void> updateScan(ScanResult updatedScan, String userId) async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      List<String> existingScans = prefs.getStringList(_scansKey) ?? [];
+      final userKey = _getUserScansKey(userId);
+      List<String> existingScans = prefs.getStringList(userKey) ?? [];
       
       for (int i = 0; i < existingScans.length; i++) {
         final scan = ScanResult.fromJson(jsonDecode(existingScans[i]));
@@ -126,21 +135,36 @@ class ScanStorage {
         }
       }
       
-      await prefs.setStringList(_scansKey, existingScans);
-      print('✏️ Scan updated successfully: ${updatedScan.projectName}');
+      await prefs.setStringList(userKey, existingScans);
+      print('✏️ Scan updated successfully for user $userId: ${updatedScan.projectName}');
     } catch (e) {
       print('❌ Error updating scan: $e');
     }
   }
 
-  // Clear all scans
-  static Future<void> clearAllScans() async {
+  // Clear all scans for a specific user
+  static Future<void> clearAllScans(String userId) async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      await prefs.remove(_scansKey);
-      print('🧹 All scans cleared');
+      final userKey = _getUserScansKey(userId);
+      await prefs.remove(userKey);
+      print('🧹 All scans cleared for user $userId');
     } catch (e) {
       print('❌ Error clearing scans: $e');
+    }
+  }
+
+  // Check if a scan name already exists for a user (excluding a specific scan ID for updates)
+  static Future<bool> scanNameExists(String projectName, String userId, {String? excludeScanId}) async {
+    try {
+      final scans = await loadScans(userId);
+      return scans.any((scan) => 
+        scan.projectName.toLowerCase() == projectName.toLowerCase() && 
+        scan.id != excludeScanId
+      );
+    } catch (e) {
+      print('❌ Error checking scan name: $e');
+      return false;
     }
   }
 }

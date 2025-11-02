@@ -1,5 +1,7 @@
 // lib/user_profile_page.dart
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
+import 'dart:io';
 import './auth_service.dart';
 import './edit_profile_page.dart';
 import './change_password_page.dart';
@@ -25,7 +27,9 @@ class _UserProfilePageState extends State<UserProfilePage> {
 
   Future<void> _loadPreviousScans() async {
     try {
-      final scans = await ScanStorage.loadScans();
+      // Get current user email as identifier
+      final userEmail = AuthService().userIdentifier;
+      final scans = await ScanStorage.loadScans(userEmail);
       setState(() {
         _previousScans = scans;
         _isLoadingScans = false;
@@ -35,6 +39,20 @@ class _UserProfilePageState extends State<UserProfilePage> {
       setState(() {
         _isLoadingScans = false;
       });
+    }
+  }
+
+  ImageProvider _getProfileImage(String? photoUrl) {
+    if (photoUrl == null || photoUrl.isEmpty) {
+      return NetworkImage('https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?ixlib=rb-4.0.3&auto=format&fit=crop&w=150&q=80');
+    }
+    
+    // Check if it's a network URL or a local file path
+    if (photoUrl.startsWith('http://') || photoUrl.startsWith('https://')) {
+      return NetworkImage(photoUrl);
+    } else {
+      // It's a local file path
+      return FileImage(File(photoUrl));
     }
   }
 
@@ -65,10 +83,34 @@ class _UserProfilePageState extends State<UserProfilePage> {
             ),
             child: Column(
               children: [
-                CircleAvatar(
-                  radius: 50,
-                  backgroundImage: NetworkImage(user.photoUrl ?? 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?ixlib=rb-4.0.3&auto=format&fit=crop&w=150&q=80'),
-                  backgroundColor: Colors.white,
+                Stack(
+                  children: [
+                    CircleAvatar(
+                      radius: 50,
+                      backgroundImage: _getProfileImage(user.photoUrl),
+                      backgroundColor: Colors.white,
+                    ),
+                    Positioned(
+                      bottom: 0,
+                      right: 0,
+                      child: GestureDetector(
+                        onTap: _showProfilePictureOptions,
+                        child: Container(
+                          padding: EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            shape: BoxShape.circle,
+                            border: Border.all(color: Color(0xFF1E3A8A), width: 2),
+                          ),
+                          child: Icon(
+                            Icons.camera_alt,
+                            size: 20,
+                            color: Color(0xFF1E3A8A),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 16),
                 Text(
@@ -412,7 +454,6 @@ class _UserProfilePageState extends State<UserProfilePage> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             _buildResultItem('Concrete Grade', scan.concreteGrade, Icons.foundation),
-            _buildResultItem('Confidence', scan.confidence, Icons.verified),
             _buildResultItem('Estimated Cost', scan.estimatedCost, Icons.attach_money),
             _buildResultItem('Area', '${scan.builtUpArea} sq.ft', Icons.square_foot),
             _buildResultItem('Building Type', scan.buildingType, Icons.business),
@@ -511,11 +552,139 @@ class _UserProfilePageState extends State<UserProfilePage> {
     );
 
     if (confirmed == true) {
-      await ScanStorage.deleteScan(scan.id);
+      // Get current user email as identifier
+      final userEmail = AuthService().userIdentifier;
+      await ScanStorage.deleteScan(scan.id, userEmail);
       _loadPreviousScans(); // Refresh the list
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Scan deleted successfully')),
       );
     }
+  }
+
+  void _showProfilePictureOptions() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) => SafeArea(
+        child: Padding(
+          padding: EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'Change Profile Picture',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF1E3A8A),
+                ),
+              ),
+              SizedBox(height: 20),
+              ListTile(
+                leading: Icon(Icons.photo_camera, color: Color(0xFF1E3A8A)),
+                title: Text('Take Photo'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _pickImage(ImageSource.camera);
+                },
+              ),
+              ListTile(
+                leading: Icon(Icons.photo_library, color: Color(0xFF1E3A8A)),
+                title: Text('Choose from Gallery'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _pickImage(ImageSource.gallery);
+                },
+              ),
+              if (AuthService().user?.photoUrl != null)
+                ListTile(
+                  leading: Icon(Icons.delete, color: Colors.red),
+                  title: Text('Remove Photo', style: TextStyle(color: Colors.red)),
+                  onTap: () {
+                    Navigator.pop(context);
+                    _removeProfilePicture();
+                  },
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _pickImage(ImageSource source) async {
+    try {
+      final ImagePicker picker = ImagePicker();
+      final XFile? image = await picker.pickImage(
+        source: source,
+        maxWidth: 512,
+        maxHeight: 512,
+        imageQuality: 75,
+      );
+
+      if (image != null) {
+        // In a real app, you would upload this to a server and get a URL
+        // For now, we'll use a local file path which can be displayed using FileImage
+        final String imagePath = image.path;
+        
+        // Update the profile picture in the auth service
+        AuthService().updateProfilePicture(imagePath);
+        
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                Icon(Icons.check_circle, color: Colors.white),
+                SizedBox(width: 8),
+                Text('Profile picture updated successfully!'),
+              ],
+            ),
+            backgroundColor: Colors.green,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+        
+        setState(() {}); // Refresh UI
+      }
+    } catch (e) {
+      print('❌ Error picking image: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              Icon(Icons.error, color: Colors.white),
+              SizedBox(width: 8),
+              Text('Failed to update profile picture'),
+            ],
+          ),
+          backgroundColor: Colors.red,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+  }
+
+  void _removeProfilePicture() {
+    AuthService().updateProfilePicture('https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?ixlib=rb-4.0.3&auto=format&fit=crop&w=150&q=80');
+    
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            Icon(Icons.check_circle, color: Colors.white),
+            SizedBox(width: 8),
+            Text('Profile picture removed'),
+          ],
+        ),
+        backgroundColor: Colors.green,
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+    
+    setState(() {}); // Refresh UI
   }
 }

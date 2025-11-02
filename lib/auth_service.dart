@@ -12,11 +12,14 @@ class AuthService extends ChangeNotifier {
   UserModel? get user => _user;
 
   bool get isLoggedIn => _user != null;
+  
+  // Get the user's email as the unique identifier
+  String get userIdentifier => _user?.email ?? 'anonymous';
 
   // Mock sign-in for email/password
   void mockSignIn(String name, String email) {
     _user = UserModel(
-      uid: 'mock_user_123',
+      uid: email, // Use email as UID for consistency
       name: name,
       email: email,
       phone: '9876543210',
@@ -27,7 +30,14 @@ class AuthService extends ChangeNotifier {
   
   // Sign-in with Google
   void signInWithGoogle(UserModel user) {
-      _user = user;
+      // Ensure UID is set to email for consistency
+      _user = UserModel(
+        uid: user.email,
+        name: user.name,
+        email: user.email,
+        phone: user.phone,
+        photoUrl: user.photoUrl,
+      );
       notifyListeners();
   }
 
@@ -43,6 +53,14 @@ class AuthService extends ChangeNotifier {
     if (_user != null) {
       _user!.name = newName;
       _user!.phone = newPhone;
+      notifyListeners();
+    }
+  }
+
+  // Update profile picture
+  void updateProfilePicture(String photoUrl) {
+    if (_user != null) {
+      _user!.photoUrl = photoUrl;
       notifyListeners();
     }
   }

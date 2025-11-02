@@ -14,6 +14,7 @@ import googlemaps
 import requests as http_requests
 import sqlite3
 from datetime import datetime
+import hashlib
 
 # Load environment variables
 load_dotenv()
@@ -31,7 +32,7 @@ app.add_middleware(
 )
 
 # Use the same Web Client ID from your Flutter app
-GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "137371359979-uteh19od42d7hjal2s75ifcbf8329i5i.apps.googleusercontent.com")
+GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "258088043167-tajnkjfkk56cv40jveigggju2qhaeutj.apps.googleusercontent.com")
 
 # Google Maps API configuration
 GOOGLE_MAPS_API_KEY = os.getenv("GOOGLE_MAPS_API_KEY", "AIzaSyCzWcYKBQGWFY7uqSp15BN8OKNsaqVJlYY")
@@ -264,6 +265,7 @@ class ProjectCreate(BaseModel):
     project_type: str  # "Residential" or "Commercial"
     budget: Optional[float] = 0.0
     description: Optional[str] = ""
+    user_id: Optional[str] = "anonymous"
 
 class Project(BaseModel):
     id: int
@@ -287,6 +289,19 @@ def init_db():
     """Initialize the SQLite database for storing community-reported prices"""
     conn = sqlite3.connect('store_prices.db')
     cursor = conn.cursor()
+    
+    # Create users table (for email-based authentication tracking)
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            email TEXT UNIQUE NOT NULL,
+            name TEXT NOT NULL,
+            password_hash TEXT,
+            created_at TEXT NOT NULL,
+            last_login TEXT,
+            auth_provider TEXT DEFAULT 'email'
+        )
+    ''')
     
     # Create predictions table (for ML model)
     cursor.execute('''
@@ -331,6 +346,8 @@ def init_db():
         )
     ''')
     
+    # Note: user_id stores the user's email address for user identification and project isolation
+    
     # Create project_tasks table (for construction phase checklist)
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS project_tasks (
@@ -365,9 +382,182 @@ def init_db():
 # Initialize database on startup
 init_db()
 
+# Password hashing helper functions
+def hash_password(password: str) -> str:
+    """Hash a password using SHA-256"""
+    return hashlib.sha256(password.encode()).hexdigest()
+
+def verify_password(password: str, password_hash: str) -> bool:
+    """Verify a password against its hash"""
+    return hash_password(password) == password_hash
+
 @app.get("/")
 def read_root():
     return {"message": "Building Platform FastAPI Backend is running!"}
+
+@app.get("/api/v1/users/check-email")
+async def check_email_exists(email: str):
+    """
+    Check if an email already exists in the system
+    """
+    try:
+        conn = sqlite3.connect('store_prices.db')
+        cursor = conn.cursor()
+        
+        # Check if email exists in users table
+        cursor.execute('SELECT email FROM users WHERE email = ?', (email,))
+        user = cursor.fetchone()
+        
+        conn.close()
+        
+        exists = user is not None
+        print(f"{'✅' if exists else '❌'} Email check: {email} - {'Exists' if exists else 'Available'}")
+        
+        return {
+            "success": True,
+            "exists": exists,
+            "email": email
+        }
+    except Exception as e:
+        print(f"❌ Error checking email: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to check email: {str(e)}")
+
+@app.post("/api/v1/users/register")
+async def register_user(user_data: dict):
+    """
+    Register a new user with their email, name, and password
+    """
+    try:
+        email = user_data.get('email')
+        name = user_data.get('name')
+        password = user_data.get('password')
+        auth_provider = user_data.get('auth_provider', 'email')  # 'email' or 'google'
+        
+        if not email or not name:
+            raise HTTPException(status_code=400, detail="Email and name are required")
+        
+        if auth_provider == 'email' and not password:
+            raise HTTPException(status_code=400, detail="Password is required for email registration")
+        
+        conn = sqlite3.connect('store_prices.db')
+        cursor = conn.cursor()
+        
+        # Check if email already exists
+        cursor.execute('SELECT email FROM users WHERE email = ?', (email,))
+        if cursor.fetchone():
+            conn.close()
+            raise HTTPException(status_code=409, detail="Email already exists")
+        
+        # Hash password if provided (for email auth)
+        password_hash = hash_password(password) if password else None
+        
+        # Insert new user
+        created_at = datetime.now().isoformat()
+        cursor.execute('''
+            INSERT INTO users (email, name, password_hash, created_at, last_login, auth_provider)
+            VALUES (?, ?, ?, ?, ?, ?)
+        ''', (email, name, password_hash, created_at, created_at, auth_provider))
+        
+        conn.commit()
+        conn.close()
+        
+        print(f"✅ User registered: {name} ({email}) via {auth_provider}")
+        
+        return {
+            "success": True,
+            "message": "User registered successfully",
+            "user": {
+                "email": email,
+                "name": name,
+                "created_at": created_at,
+                "auth_provider": auth_provider
+            }
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ Error registering user: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to register user: {str(e)}")
+
+@app.post("/api/v1/users/login")
+async def login_user(user_data: dict):
+    """
+    Authenticate user with email and password
+    """
+    try:
+        email = user_data.get('email')
+        password = user_data.get('password')
+        
+        if not email:
+            raise HTTPException(status_code=400, detail="Email is required")
+        
+        conn = sqlite3.connect('store_prices.db')
+        cursor = conn.cursor()
+        
+        # Get user by email
+        cursor.execute('SELECT email, name, password_hash, auth_provider FROM users WHERE email = ?', (email,))
+        user = cursor.fetchone()
+        
+        if not user:
+            conn.close()
+            print(f"⚠️ Login attempt for unregistered email: {email}")
+            return {
+                "success": False,
+                "message": "Email not found. Please sign up first."
+            }
+        
+        user_email, user_name, password_hash, auth_provider = user
+        
+        # If user registered with Google, they can't login with password
+        if auth_provider == 'google' and password:
+            conn.close()
+            print(f"⚠️ Password login attempted for Google account: {email}")
+            return {
+                "success": False,
+                "message": "This email is registered with Google. Please sign in with Google."
+            }
+        
+        # Verify password for email-registered users
+        if auth_provider == 'email':
+            if not password:
+                conn.close()
+                return {
+                    "success": False,
+                    "message": "Password is required"
+                }
+            
+            if not verify_password(password, password_hash):
+                conn.close()
+                print(f"❌ Invalid password for email: {email}")
+                return {
+                    "success": False,
+                    "message": "Incorrect password"
+                }
+        
+        # Update last login
+        cursor.execute('''
+            UPDATE users SET last_login = ? WHERE email = ?
+        ''', (datetime.now().isoformat(), email))
+        conn.commit()
+        conn.close()
+        
+        print(f"✅ User logged in: {user_name} ({email})")
+        
+        return {
+            "success": True,
+            "message": "Login successful",
+            "user": {
+                "email": user_email,
+                "name": user_name,
+                "auth_provider": auth_provider
+            }
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ Error during login: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to login: {str(e)}")
 
 @app.post("/api/v1/debug/request")
 async def debug_request(request: Request):
@@ -856,6 +1046,7 @@ async def get_store_details(place_id: str):
 async def create_project(project: ProjectCreate):
     """
     Create a new construction project and its associated tasks from template
+    User is identified by email address
     """
     try:
         # Validate project type
@@ -866,17 +1057,22 @@ async def create_project(project: ProjectCreate):
         conn = sqlite3.connect('store_prices.db')
         cursor = conn.cursor()
         
-        # Insert new project
+        # Insert new project with user_id (email) from request body
         created_at = datetime.now().isoformat()
+        user_id = project.user_id if project.user_id else 'anonymous'
+        
+        print(f"🏗️ Creating project '{project.name}' for user (email): {user_id}")
+        
         cursor.execute('''
-            INSERT INTO projects (name, location, project_type, budget, created_at, description, status)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO projects (name, location, project_type, budget, created_at, user_id, description, status)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         ''', (
             project.name,
             project.location,
             project.project_type,
             project.budget,
             created_at,
+            user_id,
             project.description,
             'Planning'
         ))
@@ -951,18 +1147,19 @@ async def create_project(project: ProjectCreate):
 @app.get("/api/v1/projects")
 async def get_projects(user_id: str = "anonymous"):
     """
-    Get all projects for a user
+    Get all projects for a specific user (identified by email)
     """
     try:
         conn = sqlite3.connect('store_prices.db')
         cursor = conn.cursor()
         
-        # Get all projects (for now, we'll get all projects regardless of user)
+        # Get projects for the specific user (by email)
         cursor.execute('''
             SELECT id, name, location, project_type, budget, created_at, user_id, description, status
             FROM projects
+            WHERE user_id = ?
             ORDER BY created_at DESC
-        ''')
+        ''', (user_id,))
         
         projects = []
         for row in cursor.fetchall():
@@ -980,7 +1177,7 @@ async def get_projects(user_id: str = "anonymous"):
         
         conn.close()
         
-        print(f"✅ Retrieved {len(projects)} projects")
+        print(f"✅ Retrieved {len(projects)} projects for user (email): {user_id}")
         return {
             "success": True,
             "projects": projects,

@@ -10,6 +10,7 @@ import './data/models.dart';
 import './data/mock_data.dart';
 import './store_details_page.dart';
 import './auth_service.dart';
+import './auth_api_service.dart';
 import './user_profile_page.dart';
 import 'prediction_page.dart';
 import 'shop_search_page.dart';
@@ -74,10 +75,9 @@ class _MainScreenState extends State<MainScreen> {
   // List of the main pages accessible from the bottom navigation bar.
   List<Widget> get _screens => [
     HomePage(onCategorySelected: _onCategorySelected),
-    const SearchPage(),
+    const ShopSearchPage(),
     const QuestionnairePage(),
     const ProjectsPage(),
-    const FavoritesPage(),
     const ProfilePage(), // The router page for login/profile
   ];
 
@@ -125,8 +125,7 @@ class _MainScreenState extends State<MainScreen> {
                 _buildNavItem(Icons.search, 'Search', 1),
                 _buildNavItem(Icons.help_outline, 'Questionnaire', 2),
                 _buildNavItem(Icons.construction, 'Projects', 3),
-                _buildNavItem(Icons.favorite_border, 'Favorites', 4),
-                _buildNavItem(Icons.person, 'Profile', 5),
+                _buildNavItem(Icons.person, 'Profile', 4),
               ],
             ),
           ),
@@ -205,9 +204,6 @@ class _NavigationWrapperState extends State<NavigationWrapper> {
             destinationPage = const ProjectsPage();
             break;
           case 4:
-            destinationPage = const FavoritesPage();
-            break;
-          case 5:
             destinationPage = const ProfilePage();
             break;
           default:
@@ -275,8 +271,7 @@ class _NavigationWrapperState extends State<NavigationWrapper> {
                 _buildNavItem(Icons.search, 'Search', 1),
                 _buildNavItem(Icons.help_outline, 'Questionnaire', 2),
                 _buildNavItem(Icons.construction, 'Projects', 3),
-                _buildNavItem(Icons.favorite_border, 'Favorites', 4),
-                _buildNavItem(Icons.person, 'Profile', 5),
+                _buildNavItem(Icons.person, 'Profile', 4),
               ],
             ),
           ),
@@ -848,134 +843,6 @@ class QuestionnairePage extends StatelessWidget {
   }
 }
 
-class FavoritesPage extends StatefulWidget {
-  const FavoritesPage({super.key});
-
-  @override
-  State<FavoritesPage> createState() => _FavoritesPageState();
-}
-
-class _FavoritesPageState extends State<FavoritesPage> {
-  List<Product> _favoritedProducts = [];
-
-  @override
-  void initState() {
-    super.initState();
-    _loadFavorites();
-  }
-
-  void _loadFavorites() {
-    setState(() {
-      _favoritedProducts = MockDataService.getFavoritedProducts();
-    });
-  }
-
-  void _toggleFavorite(String productId) {
-    setState(() {
-      MockDataService.toggleFavoriteStatus(productId);
-      _loadFavorites();
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.white,
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Favorite Products',
-                style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
-                      color: const Color(0xFF1E3A8A),
-                    ),
-              ),
-              const SizedBox(height: 20),
-              _favoritedProducts.isEmpty
-                  ? Expanded(
-                      child: Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(Icons.favorite_border,
-                                size: 64, color: Colors.grey[400]),
-                            const SizedBox(height: 16),
-                            Text(
-                              'No favorites yet',
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .titleMedium
-                                  ?.copyWith(color: Colors.grey[600]),
-                            ),
-                            const Text(
-                              'Tap the heart icon on a product to save it.',
-                              style: TextStyle(color: Colors.grey),
-                            ),
-                          ],
-                        ),
-                      ),
-                    )
-                  : Expanded(
-                      child: ListView.builder(
-                        itemCount: _favoritedProducts.length,
-                        itemBuilder: (context, index) {
-                          final product = _favoritedProducts[index];
-                          return Card(
-                            margin: const EdgeInsets.only(bottom: 12),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: ListTile(
-                              leading: ClipRRect(
-                                borderRadius: BorderRadius.circular(8.0),
-                                child: Image.network(
-                                  product.imageUrl,
-                                  width: 50,
-                                  height: 50,
-                                  fit: BoxFit.cover,
-                                  errorBuilder: (context, error, stackTrace) {
-                                    return Container(
-                                      width: 50,
-                                      height: 50,
-                                      decoration: BoxDecoration(
-                                        color: Colors.grey[300],
-                                        borderRadius:
-                                            BorderRadius.circular(8.0),
-                                      ),
-                                      child: const Icon(
-                                        Icons.shopping_bag,
-                                        color: Colors.grey,
-                                        size: 24,
-                                      ),
-                                    );
-                                  },
-                                ),
-                              ),
-                              title: Text(product.name),
-                              subtitle: Text(
-                                  '₹${product.price.toStringAsFixed(2)}'),
-                              trailing: IconButton(
-                                icon: const Icon(Icons.favorite,
-                                    color: Colors.redAccent),
-                                onPressed: () => _toggleFavorite(product.id),
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-                    ),
-            ],
-          ),
-        ),
-      ),
-      // FIX: Removed the redundant bottom navigation bar.
-    );
-  }
-}
 
 // --- AUTH AND PROFILE WIDGETS (REFACTORED) ---
 
@@ -1060,19 +927,115 @@ class _LoginSignUpPageState extends State<LoginSignUpPage>
     super.dispose();
   }
 
-  void _handleEmailLogin() {
+  void _handleEmailLogin() async {
     if (_loginFormKey.currentState!.validate()) {
-      // Mocks a successful sign-in and notifies listeners to rebuild ProfilePage
-      AuthService()
-          .mockSignIn(_loginEmailController.text, _loginEmailController.text);
+      final email = _loginEmailController.text.trim();
+      final password = _loginPasswordController.text.trim();
+      
+      // Attempt login with backend
+      final result = await AuthApiService.loginUser(email, password: password);
+      
+      if (result != null && result['success'] == true) {
+        // Login successful
+        final userName = result['user']['name'];
+        AuthService().mockSignIn(userName, email);
+        
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Successfully logged in!'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
+      } else if (result != null) {
+        // Login failed - show error message from backend
+        final message = result['message'] ?? 'Login failed';
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(message),
+              backgroundColor: Colors.red,
+              duration: const Duration(seconds: 3),
+            ),
+          );
+        }
+      } else {
+        // Network or other error
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Login failed. Please try again.'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
     }
   }
 
-  void _handleEmailSignUp() {
+  void _handleEmailSignUp() async {
     if (_signupFormKey.currentState!.validate()) {
-      // Mocks a successful sign-up and notifies listeners to rebuild ProfilePage
-      AuthService()
-          .mockSignIn(_signupNameController.text, _signupEmailController.text);
+      final email = _signupEmailController.text.trim();
+      final name = _signupNameController.text.trim();
+      final password = _signupPasswordController.text.trim();
+      
+      // Check if email already exists
+      final emailExists = await AuthApiService.checkEmailExists(email);
+      
+      if (emailExists) {
+        // Email already exists
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Email already exists. Please login instead.'),
+              backgroundColor: Colors.red,
+              duration: Duration(seconds: 3),
+            ),
+          );
+        }
+        return;
+      }
+      
+      // Register new user with password
+      final result = await AuthApiService.registerUser(
+        email: email,
+        name: name,
+        password: password,
+        authProvider: 'email',
+      );
+      
+      if (result != null && result['success'] == true) {
+        // Registration successful, sign them in
+        AuthService().mockSignIn(name, email);
+        
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Account created successfully!'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
+      } else if (result != null && result['error'] == 'Email already exists') {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Email already exists. Please login instead.'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Failed to create account. Please try again.'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
     }
   }
 
@@ -1082,18 +1045,28 @@ class _LoginSignUpPageState extends State<LoginSignUpPage>
     // IMPROVEMENT: This URL should be in a config file, not hardcoded.
     const serverUrl = 'http://127.0.0.1:8000';
     const googleWebClientId =
-        '137371359979-uteh19od42d7hjal2s75ifcbf8329i5i.apps.googleusercontent.com';
+        '258088043167-tajnkjfkk56cv40jveigggju2qhaeutj.apps.googleusercontent.com';
 
+    // Note: For iOS, we need both serverClientId (web) for backend verification
+    // and the iOS client must be configured in Google Cloud Console
     final GoogleSignIn googleSignIn =
-        GoogleSignIn(serverClientId: googleWebClientId);
+        GoogleSignIn(
+          serverClientId: googleWebClientId,
+          scopes: ['email', 'profile'],
+        );
 
     try {
+      debugPrint('🔵 Starting Google Sign-In...');
+      debugPrint('🔵 Using Web Client ID: $googleWebClientId');
+      
       final GoogleSignInAccount? googleUser = await googleSignIn.signIn();
       if (googleUser == null) {
-        debugPrint('User cancelled Google Sign-In');
+        debugPrint('❌ User cancelled Google Sign-In');
         return;
       }
 
+      debugPrint('✅ Google user signed in: ${googleUser.email}');
+      
       final GoogleSignInAuthentication googleAuth =
           await googleUser.authentication;
       final String? idToken = googleAuth.idToken;
@@ -1102,6 +1075,8 @@ class _LoginSignUpPageState extends State<LoginSignUpPage>
         throw Exception('Could not retrieve ID token.');
       }
 
+      debugPrint('✅ Got ID token, sending to backend...');
+      
       final response = await http.post(
         Uri.parse('$serverUrl/api/v1/auth/google'),
         headers: {'Content-Type': 'application/json'},
@@ -1112,13 +1087,30 @@ class _LoginSignUpPageState extends State<LoginSignUpPage>
         final data = jsonDecode(response.body);
         await storage.write(key: 'jwt_token', value: data['token']);
 
-        // Create user model from backend response and sign in
+        // Create user model from backend response
         final user = UserModel(
           uid: data['user']['id'], // Using correct key 'id'
           name: data['user']['name'],
           email: data['user']['email'],
           photoUrl: data['user']['picture'], // Using correct key 'picture'
         );
+
+        // Check if user exists in our system, if not register them
+        final emailExists = await AuthApiService.checkEmailExists(user.email);
+        
+        if (!emailExists) {
+          // Register new Google user (no password needed)
+          await AuthApiService.registerUser(
+            email: user.email,
+            name: user.name,
+            authProvider: 'google',
+          );
+          debugPrint('✅ New Google user registered: ${user.email}');
+        } else {
+          // Update existing user's last login (no password verification for Google users)
+          await AuthApiService.loginUser(user.email);
+          debugPrint('✅ Existing Google user logged in: ${user.email}');
+        }
 
         // This call will notify listeners and trigger the UI update
         AuthService().signInWithGoogle(user);
@@ -1136,10 +1128,27 @@ class _LoginSignUpPageState extends State<LoginSignUpPage>
     } catch (error) {
       debugPrint('Google Sign-In error: $error');
       if (mounted) {
+        // Show more detailed error message
+        String errorMessage = 'Google Sign-In failed';
+        
+        if (error.toString().contains('network')) {
+          errorMessage = 'Network error. Please check your connection and ensure the backend server is running.';
+        } else if (error.toString().contains('Backend authentication failed')) {
+          errorMessage = 'Backend server error. Make sure the server is running on port 8000.';
+        } else if (error.toString().contains('Could not retrieve ID token')) {
+          errorMessage = 'Failed to get Google credentials. Please try again.';
+        } else if (error.toString().contains('PlatformException')) {
+          errorMessage = 'Google Sign-In error. Check your internet connection and try again.';
+        } else {
+          errorMessage = 'Sign-in failed: ${error.toString().substring(0, error.toString().length > 100 ? 100 : error.toString().length)}';
+        }
+        
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-              content: Text('Google Sign-In failed: $error'),
-              backgroundColor: Colors.red),
+              content: Text(errorMessage),
+              backgroundColor: Colors.red,
+              duration: Duration(seconds: 5),
+          ),
         );
       }
     }

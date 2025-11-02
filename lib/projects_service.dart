@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 
 import 'package:my_app/models/project.dart';
-import 'package:my_app/models/task.dart';
 
 class ProjectsService {
   static const String _baseUrl = 'http://127.0.0.1:8000';
@@ -16,9 +15,11 @@ class ProjectsService {
     required String projectType,
     required double budget,
     String description = '',
+    required String userId,
   }) async {
     try {
-      print('🏗️ Creating new project: $name');
+      print('🏗️ Creating new project: $name for user $userId');
+      print('📝 Request body: name=$name, location=$location, type=$projectType, budget=$budget, user_id=$userId');
       
       final response = await http.post(
         Uri.parse('$_baseUrl/api/v1/projects'),
@@ -29,43 +30,55 @@ class ProjectsService {
           'project_type': projectType,
           'budget': budget,
           'description': description,
+          'user_id': userId,
         }),
       );
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         print('✅ Project created successfully: ${data['project_id']}');
+        print('📋 Response data: $data');
         return data;
       } else {
         print('❌ Failed to create project: ${response.statusCode}');
-        print('Error: ${response.body}');
+        print('Error response body: ${response.body}');
         return null;
       }
-    } catch (e) {
+    } catch (e, stackTrace) {
       print('❌ Error creating project: $e');
+      print('Stack trace: $stackTrace');
       return null;
     }
   }
 
-  /// Get all projects
-  static Future<List<Project>> getProjects() async {
+  /// Get all projects for a specific user
+  static Future<List<Project>> getProjects(String userId) async {
     try {
-      print('📂 Fetching all projects...');
+      print('📂 Fetching projects for user $userId...');
+      print('🔗 API URL: $_baseUrl/api/v1/projects?user_id=$userId');
       
       final response = await http.get(
-        Uri.parse('$_baseUrl/api/v1/projects'),
+        Uri.parse('$_baseUrl/api/v1/projects?user_id=$userId'),
       );
+
+      print('📥 Response status code: ${response.statusCode}');
+      print('📥 Response body: ${response.body}');
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         
         if (data['success'] == true) {
           final List<dynamic> projectsData = data['projects'] ?? [];
+          print('📊 Raw projects data: $projectsData');
+          
           List<Project> projects = projectsData
               .map((json) => Project.fromJson(json))
               .toList();
           
           print('✅ Retrieved ${projects.length} projects');
+          if (projects.isNotEmpty) {
+            print('📋 First project: ${projects[0].name}');
+          }
           return projects;
         } else {
           print('❌ API returned success=false');
@@ -73,10 +86,12 @@ class ProjectsService {
         }
       } else {
         print('❌ Failed to get projects: ${response.statusCode}');
+        print('Error body: ${response.body}');
         return [];
       }
-    } catch (e) {
+    } catch (e, stackTrace) {
       print('❌ Error getting projects: $e');
+      print('Stack trace: $stackTrace');
       return [];
     }
   }
