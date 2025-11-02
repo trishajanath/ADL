@@ -1,9 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:google_sign_in/google_sign_in.dart';
-import 'package:http/http.dart' as http;
-import 'dart:convert';
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 // These are assumed to be in separate files. Ensure you have them in your project.
 import './data/models.dart';
@@ -45,7 +41,7 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Building Platform',
+      title: 'Struqt',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(
@@ -292,31 +288,10 @@ class HomePage extends StatefulWidget {
   State<HomePage> createState() => _HomePageState();
 }
 
-class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
-  late AnimationController _residentialController;
-  late Animation<double> _residentialScale;
-  late AnimationController _commercialController;
-  late Animation<double> _commercialScale;
-
+class _HomePageState extends State<HomePage> {
   @override
   void initState() {
     super.initState();
-    _residentialController = AnimationController(
-        duration: const Duration(milliseconds: 300), vsync: this);
-    _commercialController = AnimationController(
-        duration: const Duration(milliseconds: 300), vsync: this);
-
-    _residentialScale = Tween<double>(begin: 1.0, end: 1.05).animate(
-        CurvedAnimation(parent: _residentialController, curve: Curves.easeInOut));
-    _commercialScale = Tween<double>(begin: 1.0, end: 1.05).animate(
-        CurvedAnimation(parent: _commercialController, curve: Curves.easeInOut));
-  }
-
-  @override
-  void dispose() {
-    _residentialController.dispose();
-    _commercialController.dispose();
-    super.dispose();
   }
 
   void _navigateToResidential() {
@@ -365,7 +340,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
         backgroundColor: Colors.white,
         elevation: 0,
         title: Text(
-          'Building Platform',
+          'Struqt',
           style: TextStyle(
               color: const Color(0xFF1E3A8A), fontWeight: FontWeight.bold),
         ),
@@ -375,76 +350,57 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
         children: [
           // Residential Section (Top Half)
           Expanded(
-            child: MouseRegion(
-              onEnter: (_) {
-                _residentialController.forward();
-                _commercialController.reverse();
-              },
-              onExit: (_) {
-                _residentialController.reverse();
-              },
-              child: GestureDetector(
-                onTap: _navigateToResidential,
-                child: AnimatedBuilder(
-                  animation: _residentialScale,
-                  builder: (context, child) {
-                    return Transform.scale(
-                      scale: _residentialScale.value,
-                      child: Container(
-                        margin: EdgeInsets.all(8),
-                        decoration: const BoxDecoration(
-                          borderRadius: BorderRadius.all(Radius.circular(12)),
-                          image: DecorationImage(
-                            image: NetworkImage(
-                                'https://images.unsplash.com/photo-1564013799919-ab600027ffc6?ixlib=rb-4.0.3&auto=format&fit=crop&w=1000&q=80'),
-                            fit: BoxFit.cover,
-                          ),
+            child: GestureDetector(
+              onTap: _navigateToResidential,
+              child: Container(
+                width: double.infinity,
+                decoration: const BoxDecoration(
+                  image: DecorationImage(
+                    image: NetworkImage(
+                        'https://images.unsplash.com/photo-1564013799919-ab600027ffc6?ixlib=rb-4.0.3&auto=format&fit=crop&w=1000&q=80'),
+                    fit: BoxFit.cover,
+                  ),
+                ),
+                child: Container(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [
+                        Colors.black.withOpacity(0.3),
+                        Colors.black.withOpacity(0.1),
+                      ],
+                    ),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        Text(
+                          'For Residential',
+                          style: Theme.of(context)
+                              .textTheme
+                              .headlineSmall
+                              ?.copyWith(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                              ),
                         ),
-                        child: Container(
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.all(Radius.circular(12)),
-                            gradient: LinearGradient(
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
-                              colors: [
-                                Colors.black.withOpacity(0.3),
-                                Colors.black.withOpacity(0.1),
-                              ],
-                            ),
-                          ),
-                          child: Padding(
-                            padding: const EdgeInsets.all(24),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              mainAxisAlignment: MainAxisAlignment.end,
-                              children: [
-                                Text(
-                                  'For Residential',
-                                  style: Theme.of(context)
-                                      .textTheme
-                                      .headlineSmall
-                                      ?.copyWith(
-                                        color: Colors.white,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                ),
-                                const SizedBox(height: 8),
-                                Text(
-                                  'Perfect solutions for your dream home.',
-                                  style: Theme.of(context)
-                                      .textTheme
-                                      .bodyMedium
-                                      ?.copyWith(
-                                        color: Colors.white.withOpacity(0.9),
-                                      ),
-                                ),
-                              ],
-                            ),
-                          ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Perfect solutions for your dream home.',
+                          style: Theme.of(context)
+                              .textTheme
+                              .bodyMedium
+                              ?.copyWith(
+                                color: Colors.white.withOpacity(0.9),
+                              ),
                         ),
-                      ),
-                    );
-                  },
+                      ],
+                    ),
+                  ),
                 ),
               ),
             ),
@@ -452,76 +408,57 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
           
           // Commercial Section (Bottom Half)
           Expanded(
-            child: MouseRegion(
-              onEnter: (_) {
-                _commercialController.forward();
-                _residentialController.reverse();
-              },
-              onExit: (_) {
-                _commercialController.reverse();
-              },
-              child: GestureDetector(
-                onTap: _navigateToCommercial,
-                child: AnimatedBuilder(
-                  animation: _commercialScale,
-                  builder: (context, child) {
-                    return Transform.scale(
-                      scale: _commercialScale.value,
-                      child: Container(
-                        margin: EdgeInsets.all(8),
-                        decoration: const BoxDecoration(
-                          borderRadius: BorderRadius.all(Radius.circular(12)),
-                          image: DecorationImage(
-                            image: NetworkImage(
-                                'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?ixlib=rb-4.0.3&auto=format&fit=crop&w=1000&q=80'),
-                            fit: BoxFit.cover,
-                          ),
+            child: GestureDetector(
+              onTap: _navigateToCommercial,
+              child: Container(
+                width: double.infinity,
+                decoration: const BoxDecoration(
+                  image: DecorationImage(
+                    image: NetworkImage(
+                        'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?ixlib=rb-4.0.3&auto=format&fit=crop&w=1000&q=80'),
+                    fit: BoxFit.cover,
+                  ),
+                ),
+                child: Container(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [
+                        Colors.black.withOpacity(0.4),
+                        Colors.black.withOpacity(0.1),
+                      ],
+                    ),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        Text(
+                          'For Commercial',
+                          style: Theme.of(context)
+                              .textTheme
+                              .headlineSmall
+                              ?.copyWith(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                              ),
                         ),
-                        child: Container(
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.all(Radius.circular(12)),
-                            gradient: LinearGradient(
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
-                              colors: [
-                                Colors.black.withOpacity(0.4),
-                                Colors.black.withOpacity(0.1),
-                              ],
-                            ),
-                          ),
-                          child: Padding(
-                            padding: const EdgeInsets.all(24),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              mainAxisAlignment: MainAxisAlignment.end,
-                              children: [
-                                Text(
-                                  'For Commercial',
-                                  style: Theme.of(context)
-                                      .textTheme
-                                      .headlineSmall
-                                      ?.copyWith(
-                                        color: Colors.white,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                ),
-                                const SizedBox(height: 8),
-                                Text(
-                                  'Comprehensive solutions for commercial and corporate projects.',
-                                  style: Theme.of(context)
-                                      .textTheme
-                                      .bodyMedium
-                                      ?.copyWith(
-                                        color: Colors.white.withOpacity(0.9),
-                                      ),
-                                ),
-                              ],
-                            ),
-                          ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Comprehensive solutions for commercial and corporate projects.',
+                          style: Theme.of(context)
+                              .textTheme
+                              .bodyMedium
+                              ?.copyWith(
+                                color: Colors.white.withOpacity(0.9),
+                              ),
                         ),
-                      ),
-                    );
-                  },
+                      ],
+                    ),
+                  ),
                 ),
               ),
             ),
@@ -1039,121 +976,6 @@ class _LoginSignUpPageState extends State<LoginSignUpPage>
     }
   }
 
-  // FIX: Unified and corrected Google Sign-In logic.
-  Future<void> _handleGoogleSignIn() async {
-    const storage = FlutterSecureStorage();
-    // IMPROVEMENT: This URL should be in a config file, not hardcoded.
-    const serverUrl = 'http://127.0.0.1:8000';
-    const googleWebClientId =
-        '258088043167-tajnkjfkk56cv40jveigggju2qhaeutj.apps.googleusercontent.com';
-
-    // Note: For iOS, we need both serverClientId (web) for backend verification
-    // and the iOS client must be configured in Google Cloud Console
-    final GoogleSignIn googleSignIn =
-        GoogleSignIn(
-          serverClientId: googleWebClientId,
-          scopes: ['email', 'profile'],
-        );
-
-    try {
-      debugPrint('🔵 Starting Google Sign-In...');
-      debugPrint('🔵 Using Web Client ID: $googleWebClientId');
-      
-      final GoogleSignInAccount? googleUser = await googleSignIn.signIn();
-      if (googleUser == null) {
-        debugPrint('❌ User cancelled Google Sign-In');
-        return;
-      }
-
-      debugPrint('✅ Google user signed in: ${googleUser.email}');
-      
-      final GoogleSignInAuthentication googleAuth =
-          await googleUser.authentication;
-      final String? idToken = googleAuth.idToken;
-
-      if (idToken == null) {
-        throw Exception('Could not retrieve ID token.');
-      }
-
-      debugPrint('✅ Got ID token, sending to backend...');
-      
-      final response = await http.post(
-        Uri.parse('$serverUrl/api/v1/auth/google'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'idToken': idToken}),
-      );
-
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        await storage.write(key: 'jwt_token', value: data['token']);
-
-        // Create user model from backend response
-        final user = UserModel(
-          uid: data['user']['id'], // Using correct key 'id'
-          name: data['user']['name'],
-          email: data['user']['email'],
-          photoUrl: data['user']['picture'], // Using correct key 'picture'
-        );
-
-        // Check if user exists in our system, if not register them
-        final emailExists = await AuthApiService.checkEmailExists(user.email);
-        
-        if (!emailExists) {
-          // Register new Google user (no password needed)
-          await AuthApiService.registerUser(
-            email: user.email,
-            name: user.name,
-            authProvider: 'google',
-          );
-          debugPrint('✅ New Google user registered: ${user.email}');
-        } else {
-          // Update existing user's last login (no password verification for Google users)
-          await AuthApiService.loginUser(user.email);
-          debugPrint('✅ Existing Google user logged in: ${user.email}');
-        }
-
-        // This call will notify listeners and trigger the UI update
-        AuthService().signInWithGoogle(user);
-
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-                content: Text('Successfully signed in!'),
-                backgroundColor: Colors.green),
-          );
-        }
-      } else {
-        throw Exception('Backend authentication failed: ${response.body}');
-      }
-    } catch (error) {
-      debugPrint('Google Sign-In error: $error');
-      if (mounted) {
-        // Show more detailed error message
-        String errorMessage = 'Google Sign-In failed';
-        
-        if (error.toString().contains('network')) {
-          errorMessage = 'Network error. Please check your connection and ensure the backend server is running.';
-        } else if (error.toString().contains('Backend authentication failed')) {
-          errorMessage = 'Backend server error. Make sure the server is running on port 8000.';
-        } else if (error.toString().contains('Could not retrieve ID token')) {
-          errorMessage = 'Failed to get Google credentials. Please try again.';
-        } else if (error.toString().contains('PlatformException')) {
-          errorMessage = 'Google Sign-In error. Check your internet connection and try again.';
-        } else {
-          errorMessage = 'Sign-in failed: ${error.toString().substring(0, error.toString().length > 100 ? 100 : error.toString().length)}';
-        }
-        
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-              content: Text(errorMessage),
-              backgroundColor: Colors.red,
-              duration: Duration(seconds: 5),
-          ),
-        );
-      }
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -1184,7 +1006,7 @@ class _LoginSignUpPageState extends State<LoginSignUpPage>
                   ),
                   const SizedBox(height: 16),
                   Text(
-                    'Join Our Platform',
+                    'Join Struqt',
                     style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                           color: Colors.white,
                           fontWeight: FontWeight.bold,
@@ -1289,24 +1111,6 @@ class _LoginSignUpPageState extends State<LoginSignUpPage>
               ),
               child: const Text('Sign In', style: TextStyle(fontSize: 16)),
             ),
-            const SizedBox(height: 20),
-            // Google Sign In Button
-            ElevatedButton.icon(
-              onPressed: _handleGoogleSignIn,
-              icon: Image.network(
-                  'https://developers.google.com/identity/images/g-logo.png',
-                  height: 20),
-              label: const Text('Sign In with Google'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.white,
-                foregroundColor: Colors.black87,
-                padding: const EdgeInsets.symmetric(vertical: 12),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  side: BorderSide(color: Colors.grey.shade300),
-                ),
-              ),
-            ),
           ],
         ),
       ),
@@ -1383,24 +1187,6 @@ class _LoginSignUpPageState extends State<LoginSignUpPage>
               ),
               child:
                   const Text('Create Account', style: TextStyle(fontSize: 16)),
-            ),
-            const SizedBox(height: 20),
-            // Google Sign Up Button
-            ElevatedButton.icon(
-              onPressed: _handleGoogleSignIn,
-              icon: Image.network(
-                  'https://developers.google.com/identity/images/g-logo.png',
-                  height: 20),
-              label: const Text('Sign Up with Google'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.white,
-                foregroundColor: Colors.black87,
-                padding: const EdgeInsets.symmetric(vertical: 12),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  side: BorderSide(color: Colors.grey.shade300),
-                ),
-              ),
             ),
           ],
         ),

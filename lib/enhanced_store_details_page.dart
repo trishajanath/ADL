@@ -319,11 +319,13 @@ class _EnhancedStoreDetailsPageState extends State<EnhancedStoreDetailsPage> {
               children: [
                 const Icon(Icons.monetization_on, color: Color(0xFF1E3A8A)),
                 const SizedBox(width: 8),
-                const Text(
-                  'Community-Reported Prices',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                const Expanded(
+                  child: Text(
+                    'Community-Reported Prices',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  ),
                 ),
-                const Spacer(),
+                const SizedBox(width: 8),
                 ElevatedButton.icon(
                   onPressed: _showPriceReportDialog,
                   icon: const Icon(Icons.add, size: 16),
@@ -751,11 +753,12 @@ class _EnhancedStoreDetailsPageState extends State<EnhancedStoreDetailsPage> {
               children: [
                 const Icon(Icons.reviews, color: Color(0xFF1E3A8A)),
                 const SizedBox(width: 8),
-                const Text(
-                  'Customer Reviews',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                const Expanded(
+                  child: Text(
+                    'Customer Reviews',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  ),
                 ),
-                const Spacer(),
                 if (userRatingsTotal != null)
                   Text(
                     '$userRatingsTotal reviews',
