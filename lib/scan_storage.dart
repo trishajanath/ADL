@@ -46,7 +46,22 @@ class ScanResult {
   // Getters for easy access to prediction data
   String get concreteGrade => predictionResult['prediction']?['concrete_grade'] ?? 'N/A';
   String get confidence => predictionResult['prediction']?['confidence_percentage'] ?? 'N/A';
-  String get estimatedCost => predictionResult['cost_estimation']?['total_estimated_cost'] ?? 'N/A';
+  String get estimatedCost {
+    try {
+      // Try to get cost from different possible locations
+      if (predictionResult['cost_estimation']?['total_estimated_cost'] != null) {
+        return predictionResult['cost_estimation']['total_estimated_cost'];
+      }
+      // Fallback to check if it's nested differently
+      if (predictionResult['total_estimated_cost'] != null) {
+        return predictionResult['total_estimated_cost'];
+      }
+      return 'Cost data not available';
+    } catch (e) {
+      print('Error getting cost: $e');
+      return 'Cost data not available';
+    }
+  }
   String get builtUpArea => questionnaireData['built_up_area']?.toString() ?? 'N/A';
   String get buildingType => questionnaireData['building_type'] ?? 'N/A';
   String get floors => questionnaireData['floors'] ?? 'N/A';

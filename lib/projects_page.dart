@@ -5,6 +5,7 @@ import 'widgets/project_card.dart';
 import 'projects_service.dart';
 import 'project_details_page.dart';
 import 'auth_service.dart';
+import 'scan_storage.dart';
 
 class ProjectsPage extends StatefulWidget {
   const ProjectsPage({super.key});
@@ -419,6 +420,66 @@ class _ProjectsPageState extends State<ProjectsPage> {
   }
 
   void _showNewProjectDialog() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => DefaultTabController(
+        length: 2,
+        child: AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Column(
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF1E3A8A).withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Icon(
+                      Icons.add_home_work,
+                      color: Color(0xFF1E3A8A),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  const Text('Create Project'),
+                ],
+              ),
+              const SizedBox(height: 16),
+              TabBar(
+                labelColor: const Color(0xFF1E3A8A),
+                unselectedLabelColor: Colors.grey,
+                indicatorColor: const Color(0xFF1E3A8A),
+                tabs: const [
+                  Tab(text: 'New Project'),
+                  Tab(text: 'From Scan'),
+                ],
+              ),
+            ],
+          ),
+          content: SizedBox(
+            width: double.maxFinite,
+            height: 500,
+            child: TabBarView(
+              children: [
+                _buildNewProjectForm(),
+                _buildFromScanForm(),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Close'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildNewProjectForm() {
     final nameController = TextEditingController();
     final locationController = TextEditingController();
     final budgetController = TextEditingController();
@@ -426,179 +487,280 @@ class _ProjectsPageState extends State<ProjectsPage> {
     String selectedType = 'Residential';
     bool isCreating = false;
 
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setState) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF1E3A8A).withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: const Icon(
-                  Icons.add_home_work,
-                  color: Color(0xFF1E3A8A),
-                ),
+    return StatefulBuilder(
+      builder: (context, setState) => SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: nameController,
+              decoration: const InputDecoration(
+                labelText: 'Project Name',
+                hintText: 'e.g., Family Home Construction',
+                border: OutlineInputBorder(),
+                prefixIcon: Icon(Icons.business),
               ),
-              const SizedBox(width: 12),
-              const Text('New Project'),
-            ],
-          ),
-          content: SizedBox(
-            width: double.maxFinite,
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  TextField(
-                    controller: nameController,
-                    decoration: const InputDecoration(
-                      labelText: 'Project Name',
-                      hintText: 'e.g., Family Home Construction',
-                      border: OutlineInputBorder(),
-                      prefixIcon: Icon(Icons.business),
-                    ),
-                    textCapitalization: TextCapitalization.words,
-                  ),
-                  const SizedBox(height: 16),
-                  
-                  TextField(
-                    controller: locationController,
-                    decoration: const InputDecoration(
-                      labelText: 'Location',
-                      hintText: 'e.g., Downtown District',
-                      border: OutlineInputBorder(),
-                      prefixIcon: Icon(Icons.location_on),
-                    ),
-                    textCapitalization: TextCapitalization.words,
-                  ),
-                  const SizedBox(height: 16),
-                  
-                  DropdownButtonFormField<String>(
-                    value: selectedType,
-                    decoration: const InputDecoration(
-                      labelText: 'Project Type',
-                      border: OutlineInputBorder(),
-                      prefixIcon: Icon(Icons.category),
-                    ),
-                    items: ['Residential', 'Commercial', 'Industrial', 'Infrastructure']
-                        .map((type) => DropdownMenuItem(
-                              value: type,
-                              child: Text(type),
-                            ))
-                        .toList(),
-                    onChanged: (value) {
-                      setState(() {
-                        selectedType = value!;
-                      });
-                    },
-                  ),
-                  const SizedBox(height: 16),
-                  
-                  TextField(
-                    controller: budgetController,
-                    decoration: const InputDecoration(
-                      labelText: 'Budget',
-                      hintText: 'e.g., 50000',
-                      border: OutlineInputBorder(),
-                      prefixIcon: Icon(Icons.account_balance_wallet),
-                      prefixText: '\$ ',
-                    ),
-                    keyboardType: TextInputType.number,
-                  ),
-                  const SizedBox(height: 16),
-                  
-                  TextField(
-                    controller: descriptionController,
-                    decoration: const InputDecoration(
-                      labelText: 'Description (Optional)',
-                      hintText: 'Brief project description...',
-                      border: OutlineInputBorder(),
-                      prefixIcon: Icon(Icons.description),
-                    ),
-                    maxLines: 3,
-                    textCapitalization: TextCapitalization.sentences,
-                  ),
-                ],
+              textCapitalization: TextCapitalization.words,
+            ),
+            const SizedBox(height: 16),
+            
+            TextField(
+              controller: locationController,
+              decoration: const InputDecoration(
+                labelText: 'Location',
+                hintText: 'e.g., Downtown District',
+                border: OutlineInputBorder(),
+                prefixIcon: Icon(Icons.location_on),
               ),
+              textCapitalization: TextCapitalization.words,
             ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: isCreating ? null : () => Navigator.of(context).pop(),
-              child: const Text('Cancel'),
+            const SizedBox(height: 16),
+            
+            DropdownButtonFormField<String>(
+              value: selectedType,
+              decoration: const InputDecoration(
+                labelText: 'Project Type',
+                border: OutlineInputBorder(),
+                prefixIcon: Icon(Icons.category),
+              ),
+              items: ['Residential', 'Commercial', 'Industrial', 'Infrastructure']
+                  .map((type) => DropdownMenuItem(
+                        value: type,
+                        child: Text(type),
+                      ))
+                  .toList(),
+              onChanged: (value) {
+                setState(() {
+                  selectedType = value!;
+                });
+              },
             ),
-            ElevatedButton(
-              onPressed: isCreating ? null : () async {
-                if (nameController.text.trim().isEmpty) {
-                  _showErrorMessage('Please enter a project name');
-                  return;
-                }
-                if (locationController.text.trim().isEmpty) {
-                  _showErrorMessage('Please enter a location');
-                  return;
-                }
-                
-                double? budget;
-                if (budgetController.text.trim().isNotEmpty) {
-                  budget = double.tryParse(budgetController.text.trim());
-                  if (budget == null || budget <= 0) {
-                    _showErrorMessage('Please enter a valid budget amount');
+            const SizedBox(height: 16),
+            
+            TextField(
+              controller: budgetController,
+              decoration: const InputDecoration(
+                labelText: 'Budget',
+                hintText: 'e.g., 50000',
+                border: OutlineInputBorder(),
+                prefixIcon: Icon(Icons.account_balance_wallet),
+                prefixText: '\$ ',
+              ),
+              keyboardType: TextInputType.number,
+            ),
+            const SizedBox(height: 16),
+            
+            TextField(
+              controller: descriptionController,
+              decoration: const InputDecoration(
+                labelText: 'Description (Optional)',
+                hintText: 'Brief project description...',
+                border: OutlineInputBorder(),
+                prefixIcon: Icon(Icons.description),
+              ),
+              maxLines: 3,
+              textCapitalization: TextCapitalization.sentences,
+            ),
+            const SizedBox(height: 20),
+            
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: isCreating ? null : () async {
+                  if (nameController.text.trim().isEmpty) {
+                    _showErrorMessage('Please enter a project name');
                     return;
                   }
-                } else {
-                  budget = 0.0;
-                }
-
-                setState(() => isCreating = true);
-
-                try {
-                  // Get current user email as identifier
-                  final userEmail = _authService.userIdentifier;
+                  if (locationController.text.trim().isEmpty) {
+                    _showErrorMessage('Please enter a location');
+                    return;
+                  }
                   
-                  print('🏗️ Creating project for user email: $userEmail');
-                  
-                  await ProjectsService.createProject(
-                    name: nameController.text.trim(),
-                    location: locationController.text.trim(),
-                    projectType: selectedType,
-                    budget: budget,
-                    description: descriptionController.text.trim(),
-                    userId: userEmail,
-                  );
+                  double? budget;
+                  if (budgetController.text.trim().isNotEmpty) {
+                    budget = double.tryParse(budgetController.text.trim());
+                    if (budget == null || budget <= 0) {
+                      _showErrorMessage('Please enter a valid budget amount');
+                      return;
+                    }
+                  } else {
+                    budget = 0.0;
+                  }
 
-                  Navigator.of(context).pop();
-                  _showSuccessMessage('Project created successfully!');
-                  _loadProjects();
-                } catch (e) {
-                  setState(() => isCreating = false);
-                  _showErrorMessage('Failed to create project: $e');
-                }
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF1E3A8A),
-                foregroundColor: Colors.white,
+                  setState(() => isCreating = true);
+
+                  try {
+                    final userEmail = _authService.userIdentifier;
+                    
+                    await ProjectsService.createProject(
+                      name: nameController.text.trim(),
+                      location: locationController.text.trim(),
+                      projectType: selectedType,
+                      budget: budget,
+                      description: descriptionController.text.trim(),
+                      userId: userEmail,
+                    );
+
+                    Navigator.of(context).pop();
+                    _showSuccessMessage('Project created successfully!');
+                    _loadProjects();
+                  } catch (e) {
+                    setState(() => isCreating = false);
+                    _showErrorMessage('Failed to create project: $e');
+                  }
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF1E3A8A),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                ),
+                child: isCreating
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                        ),
+                      )
+                    : const Text('Create Project'),
               ),
-              child: isCreating
-                  ? const SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                      ),
-                    )
-                  : const Text('Create Project'),
             ),
           ],
         ),
       ),
     );
+  }
+
+  Widget _buildFromScanForm() {
+    return FutureBuilder<List<ScanResult>>(
+      future: ScanStorage.loadScans(_authService.userIdentifier),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        if (snapshot.hasError) {
+          return Center(
+            child: Text('Error loading scans: ${snapshot.error}'),
+          );
+        }
+
+        final scans = snapshot.data ?? [];
+
+        if (scans.isEmpty) {
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.scanner, size: 64, color: Colors.grey[400]),
+                const SizedBox(height: 16),
+                Text(
+                  'No saved scans yet',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.grey[600],
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Complete a questionnaire to see your scans here!',
+                  style: TextStyle(
+                    color: Colors.grey[500],
+                    fontSize: 14,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ),
+          );
+        }
+
+        return ListView.builder(
+          itemCount: scans.length,
+          itemBuilder: (context, index) {
+            final scan = scans[index];
+            return Card(
+              margin: const EdgeInsets.only(bottom: 12),
+              child: ListTile(
+                leading: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: scan.category == 'residential'
+                        ? Colors.green.withOpacity(0.1)
+                        : Colors.blue.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Icon(
+                    scan.category == 'residential'
+                        ? Icons.home
+                        : Icons.business,
+                    color: scan.category == 'residential'
+                        ? Colors.green
+                        : Colors.blue,
+                  ),
+                ),
+                title: Text(
+                  scan.projectName,
+                  style: const TextStyle(fontWeight: FontWeight.w600),
+                ),
+                subtitle: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const SizedBox(height: 4),
+                    Text('Grade: ${scan.concreteGrade}'),
+                    Text('Area: ${scan.builtUpArea} sq.ft'),
+                    Text('Cost: ${scan.estimatedCost}'),
+                  ],
+                ),
+                trailing: ElevatedButton.icon(
+                  onPressed: () => _createProjectFromScan(scan),
+                  icon: const Icon(Icons.add, size: 16),
+                  label: const Text('Create'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF1E3A8A),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  ),
+                ),
+                isThreeLine: true,
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Future<void> _createProjectFromScan(ScanResult scan) async {
+    try {
+      final userEmail = _authService.userIdentifier;
+      
+      // Extract budget from estimated cost
+      double budget = 0.0;
+      try {
+        final costStr = scan.estimatedCost.replaceAll(RegExp(r'[^\d.]'), '');
+        budget = double.tryParse(costStr) ?? 0.0;
+      } catch (e) {
+        print('Could not parse budget from cost: $e');
+      }
+
+      await ProjectsService.createProject(
+        name: scan.projectName,
+        location: 'Location from ${scan.category} scan',
+        projectType: scan.category == 'residential' ? 'Residential' : 'Commercial',
+        budget: budget,
+        description: 'Created from scan - ${scan.buildingType}, ${scan.floors} floors, ${scan.builtUpArea} sq.ft, ${scan.concreteGrade}',
+        userId: userEmail,
+      );
+
+      Navigator.of(context).pop();
+      _showSuccessMessage('Project created from scan successfully!');
+      _loadProjects();
+    } catch (e) {
+      _showErrorMessage('Failed to create project from scan: $e');
+    }
   }
 
   void _showComingSoonDialog(String feature) {

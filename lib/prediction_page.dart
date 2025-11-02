@@ -38,7 +38,7 @@ class _PredictionPageState extends State<PredictionPage> {
       'id': 'floors',
       'title': 'How many floors (including ground)?',
       'type': 'dropdown',
-      'options': ['G', 'G+1', 'G+2', 'G+3', 'G+4', 'G+5', 'G+6+'],
+      'options': ['G', 'G+1', 'G+2'],
       'required': true,
     },
     {
@@ -81,6 +81,13 @@ class _PredictionPageState extends State<PredictionPage> {
       'title': 'Do you know the seismic zone of your location?',
       'type': 'dropdown',
       'options': ['Zone II', 'Zone III', 'Zone IV', 'Zone V', 'Not sure'],
+      'descriptions': {
+        'Zone II': 'Low risk - Minimal earthquake activity (e.g., parts of Maharashtra, Kerala)',
+        'Zone III': 'Moderate risk - Occasional seismic activity (e.g., Mumbai, Chennai, Bangalore)',
+        'Zone IV': 'High risk - Significant seismic activity (e.g., Delhi, Patna, parts of Himalayas)',
+        'Zone V': 'Severe risk - Highest seismic zone (e.g., Kashmir, Northeast India, Uttarakhand)',
+        'Not sure': 'We\'ll help determine the zone based on your location',
+      },
       'required': true,
     },
     {
@@ -197,6 +204,13 @@ class _PredictionPageState extends State<PredictionPage> {
       'title': 'Do you know the seismic zone of your location?',
       'type': 'dropdown',
       'options': ['Zone II', 'Zone III', 'Zone IV', 'Zone V', 'Not sure'],
+      'descriptions': {
+        'Zone II': 'Low risk - Minimal earthquake activity (e.g., parts of Maharashtra, Kerala)',
+        'Zone III': 'Moderate risk - Occasional seismic activity (e.g., Mumbai, Chennai, Bangalore)',
+        'Zone IV': 'High risk - Significant seismic activity (e.g., Delhi, Patna, parts of Himalayas)',
+        'Zone V': 'Severe risk - Highest seismic zone (e.g., Kashmir, Northeast India, Uttarakhand)',
+        'Not sure': 'We\'ll help determine the zone based on your location',
+      },
       'required': true,
     },
     {
@@ -822,11 +836,15 @@ Concrete Prediction Results:
   }
 
   Widget _buildDropdownInput(Map<String, dynamic> question) {
+    final descriptions = question['descriptions'] as Map<String, dynamic>?;
+    
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         ...question['options'].map<Widget>((option) {
           final isSelected = _formData[question['id']] == option;
+          final hasDescription = descriptions != null && descriptions.containsKey(option);
+          
           return Padding(
             padding: EdgeInsets.only(bottom: 12),
             child: GestureDetector(
@@ -847,18 +865,37 @@ Concrete Prediction Results:
                   color: isSelected ? Colors.blue.withOpacity(0.1) : Colors.white,
                 ),
                 child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Icon(
                       isSelected ? Icons.radio_button_checked : Icons.radio_button_unchecked,
                       color: isSelected ? Colors.blue : Colors.grey[400],
                     ),
                     SizedBox(width: 12),
-                    Text(
-                      option,
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-                        color: isSelected ? Colors.blue : Colors.black87,
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            option,
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                              color: isSelected ? Colors.blue : Colors.black87,
+                            ),
+                          ),
+                          if (hasDescription) ...[
+                            SizedBox(height: 4),
+                            Text(
+                              descriptions[option],
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: isSelected ? Colors.blue.shade700 : Colors.grey[600],
+                                height: 1.3,
+                              ),
+                            ),
+                          ],
+                        ],
                       ),
                     ),
                   ],
