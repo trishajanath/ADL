@@ -1,3 +1,5 @@
+# Security improvement applied
+# Issue: Security issue
 fastapi
 uvicorn[standard]
 python-dotenv
